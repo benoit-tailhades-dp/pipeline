@@ -39,7 +39,16 @@ Les trois couches existent avec un exemple vide (`exemple-*`, `statut-base`) qui
 - Next.js 16.4 App Router, React 19.3, TypeScript strict, alias `@/*` → `src/*`.
 - `next.config.ts` active `cacheComponents` et `partialPrefetching`. Toute lecture non cachée dans un Server Component (base de données, `cookies()`, `searchParams`…) doit être sous `<Suspense>` ou dans une fonction `'use cache'`, sinon la route est signalée « blocking-route ». Après une mutation, invalider avec les API de `next/cache`. Docs : `node_modules/next/dist/docs/01-app/01-getting-started/08-caching.md` et `09-revalidating.md`.
 - Next génère des types de props globaux (`LayoutProps<"/">`, `PageProps<...>`) : les utiliser plutôt que de typer les props à la main.
-- Tailwind CSS 4 est chargé par le loader `@tailwindcss/turbopack` déclaré dans `next.config.ts`. Il n'y a ni `postcss.config` ni `tailwind.config`. Le thème et les tokens (oklch, dark mode via la classe `.dark`) sont dans `src/app/globals.css`.
+- Tailwind CSS 4 est chargé par le loader `@tailwindcss/turbopack` déclaré dans `next.config.ts`. Il n'y a ni `postcss.config` ni `tailwind.config`. Le thème et les tokens (oklch) sont dans `src/app/globals.css`. Le mode sombre repose sur la classe `.dark` de `<html>`, gérée par `next-themes` (`ThemeProvider` dans `layout.tsx`, système par défaut, choix mémorisé). Le sélecteur est `src/components/theme-switch.tsx`, utilisé sur `/design-system`. Ne pas retirer `suppressHydrationWarning` de `<html>`.
+
+## Design system « Température »
+
+Référence vivante : la route `/design-system` (`src/app/design-system/page.tsx`), à mettre à jour quand un composant ou un token change. Maquette d'origine : `design-options.html`, colonne Température.
+- Les composants shadcn sont adaptés au design : `Button` (pilule, 40 px), `Input` et `SelectTrigger` (44 px, `bg-card`, halo `ring-4 ring-ring/20`), `Label` (`font-semibold`), `Badge` (variantes `froid`, `tiede`, `chaud` et taille `lg`). Après un `shadcn add`, appliquer les mêmes ajustements aux nouveaux composants.
+- Utiliser uniquement les tokens Tailwind (`bg-primary`, `text-muted-foreground`, `bg-froid`…), jamais de couleur en dur ni de valeur arbitraire quand un token existe.
+- Les étapes sont codées par température : `froid` (à contacter, premier échange), `tiede` (démo), `chaud` (proposition), `primary` (gagné). Les couleurs pleines servent aux pastilles et aux pistes (`bg-tiede`), les teintes aux fonds (`bg-tiede/15`, texte en `text-foreground`).
+- Police unique Figtree (`font-sans`, `font-heading`), titres en `font-bold tracking-tight`.
+- `--radius` vaut 12 px : champs en `h-11 rounded-lg`, cartes en `rounded-xl`, boutons en pilule (`rounded-full`, déjà dans `button.tsx`, hauteur 40 px par défaut).
 - shadcn utilise le style `base-nova`. Ses composants reposent sur `@base-ui/react`, **pas sur Radix** : ne pas reprendre d'exemples Radix (Base UI compose avec la prop `render`, pas avec `asChild`). Les icônes viennent de `lucide-react`.
 - `cn` vient du paquet npm `cn` (remplaçant de clsx + tailwind-merge) et est réexporté par `src/lib/utils.ts`. Ne pas ajouter clsx ni tailwind-merge.
 

@@ -1,0 +1,809 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Pipeline, trois design systems</title>
+<script>
+  // Thème initial : choix mémorisé, sinon celui du système.
+  (function () {
+    var saved = null;
+    try { saved = localStorage.getItem("pipeline-ds-theme"); } catch (e) {}
+    var dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+    document.documentElement.dataset.theme = saved || (dark ? "dark" : "light");
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=IBM+Plex+Sans:wdth,wght@75..100,400..700&family=Source+Sans+3:wght@400;600;700&family=Spectral:ital,wght@0,400;0,600;1,400&display=swap">
+<style>
+  /* ---------- Page (neutre, pour ne pas influencer le choix) ---------- */
+  :root {
+    color-scheme: light;
+    --page-bg: #FAFAFA;
+    --page-fg: #1F1F1F;
+    --page-muted: #666666;
+    --page-line: #DDDDDD;
+    --chip-edge: rgb(0 0 0 / 0.08);
+    --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%23555555' stroke-width='1.5'/%3E%3C/svg%3E");
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --page-bg: #181818;
+    --page-fg: #ECECEC;
+    --page-muted: #A3A3A3;
+    --page-line: #3A3A3A;
+    --chip-edge: rgb(255 255 255 / 0.12);
+    --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%23BBBBBB' stroke-width='1.5'/%3E%3C/svg%3E");
+  }
+  :root:not([data-theme="dark"]) .hex-d,
+  :root[data-theme="dark"] .hex-l { display: none; }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    padding-bottom: 72px;
+    background: var(--page-bg);
+    color: var(--page-fg);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .intro { max-width: 70ch; padding: 40px 24px 28px; }
+  .intro h1 { margin: 0 0 8px; font-size: 22px; line-height: 1.3; font-weight: 650; }
+  .intro p { margin: 0; color: var(--page-muted); }
+  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.85em; }
+
+  .theme-switch {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 10;
+    display: flex;
+    padding: 3px;
+    border: 1px solid var(--page-line);
+    border-radius: 10px;
+    background: var(--page-bg);
+    box-shadow: 0 4px 16px rgb(0 0 0 / 0.12);
+  }
+  .theme-switch button {
+    height: 32px;
+    padding: 0 14px;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--page-muted);
+    background: transparent;
+    border: 0;
+    border-radius: 7px;
+    cursor: pointer;
+  }
+  .theme-switch button[aria-pressed="true"] { color: var(--page-bg); background: var(--page-fg); }
+  .theme-switch button:focus-visible { outline: 2px solid var(--page-fg); outline-offset: 2px; }
+
+  .systems {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: repeat(6, auto);
+    gap: 0 16px;
+    padding: 0 16px 48px;
+  }
+  .ds {
+    grid-row: span 6;
+    display: grid;
+    grid-template-rows: subgrid;
+    row-gap: 0;
+    min-width: 0;
+    padding: 28px 24px 32px;
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  .blk { min-width: 0; padding-bottom: 40px; }
+  .blk:last-child { padding-bottom: 0; }
+  .blk-title {
+    margin: 0 0 14px;
+    font-family: var(--font-body);
+    font-size: 13px;
+    line-height: 20px;
+    font-weight: 600;
+    color: var(--muted-fg);
+  }
+
+  /* En-tête de chaque système */
+  .ds-head h2 { margin: 0 0 8px; font-family: var(--font-head); }
+  .ds-head p { margin: 0; max-width: 44ch; }
+
+  /* Couleurs : les pastilles lisent les tokens du thème courant. */
+  .swatches {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px 10px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .sw-chip {
+    height: 44px;
+    border-radius: var(--radius);
+    background: var(--c);
+    box-shadow: inset 0 0 0 1px var(--chip-edge);
+  }
+  .sw-name { display: block; margin-top: 6px; font-size: 13px; line-height: 18px; font-weight: 600; }
+  .sw-meta { display: block; font-size: 12px; line-height: 16px; color: var(--muted-fg); }
+
+  /* Typographie */
+  .t-display { margin: 0 0 10px; font-family: var(--font-head); }
+  .t-body { margin: 0 0 8px; max-width: 46ch; }
+  .t-small { margin: 0 0 18px; font-size: 13px; color: var(--muted-fg); }
+  .t-spec { display: grid; grid-template-columns: auto 1fr; gap: 2px 14px; margin: 0; font-size: 13px; }
+  .t-spec dt { color: var(--muted-fg); }
+  .t-spec dd { margin: 0; }
+
+  /* Boutons */
+  .btns { display: flex; flex-wrap: wrap; gap: 8px; }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 36px;
+    padding: 0 14px;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1;
+    white-space: nowrap;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    cursor: pointer;
+  }
+  .btn:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-primary { background: var(--primary); color: var(--primary-fg); }
+  .btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+  .btn-secondary { background: var(--secondary); color: var(--secondary-fg); border-color: var(--secondary-border); }
+  .btn-secondary:hover { background: var(--secondary-hover); }
+  .btn-ghost { background: transparent; color: var(--fg); }
+  .btn-ghost:hover { background: var(--muted); }
+  .btn-destructive { background: var(--destructive-bg); color: var(--destructive); border-color: var(--destructive-border); }
+
+  /* Champs */
+  .fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; }
+  .field { display: grid; gap: 6px; align-content: start; min-width: 0; }
+  .field label { font-size: 13px; line-height: 18px; font-weight: 600; }
+  .field input,
+  .field select {
+    width: 100%;
+    height: 38px;
+    padding: 0 12px;
+    font: inherit;
+    font-size: 15px;
+    color: var(--fg);
+    background-color: var(--field-bg);
+    border: 1px solid var(--input);
+    border-radius: var(--radius);
+  }
+  .field select {
+    appearance: none;
+    padding-right: 34px;
+    background-image: var(--chevron);
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+  }
+  .field input:focus,
+  .field select:focus,
+  .field .is-focus { outline: none; border-color: var(--focus-border); box-shadow: var(--focus-ring); }
+  .field input[aria-invalid="true"] { border-color: var(--destructive); }
+  .err { font-size: 13px; line-height: 18px; color: var(--destructive); }
+
+  /* ================= A. Fiche ================= */
+  .ds-a {
+    --bg: #F6F7F9;
+    --card: #FFFFFF;
+    --fg: #1B2433;
+    --primary: #24408E;
+    --primary-hover: #1B3272;
+    --primary-fg: #FFFFFF;
+    --secondary: #FFFFFF;
+    --secondary-hover: #EEF2F9;
+    --secondary-fg: #24408E;
+    --secondary-border: #24408E;
+    --muted: #EDF0F5;
+    --muted-fg: #5A6578;
+    --border: #D5DCE6;
+    --rule: #DFE7F2;
+    --input: #7D8AA0;
+    --field-bg: #FFFFFF;
+    --ring: #24408E;
+    --focus-border: #24408E;
+    --focus-ring: 0 0 0 3px rgb(36 64 142 / 0.22);
+    --relance: #C42E3A;
+    --destructive: #C42E3A;
+    --destructive-bg: transparent;
+    --destructive-border: #C42E3A;
+    --radius: 4px;
+    --font-head: "Spectral", Georgia, serif;
+    --font-body: "Source Sans 3", system-ui, sans-serif;
+  }
+  /* Fiche, sombre : la fiche sous la lampe, papier bleu nuit et encre claire. */
+  :root[data-theme="dark"] .ds-a {
+    --bg: #141B2B;
+    --card: #1B2436;
+    --fg: #E6EAF2;
+    --primary: #8AA4EE;
+    --primary-hover: #A3B8F2;
+    --primary-fg: #0F1B3D;
+    --secondary: #1B2436;
+    --secondary-hover: #24304A;
+    --secondary-fg: #8AA4EE;
+    --secondary-border: #8AA4EE;
+    --muted: #222C40;
+    --muted-fg: #A3ADC0;
+    --border: #2E3A52;
+    --rule: #253049;
+    --input: #6E7C96;
+    --field-bg: #1B2436;
+    --ring: #8AA4EE;
+    --focus-border: #8AA4EE;
+    --focus-ring: 0 0 0 3px rgb(138 164 238 / 0.3);
+    --relance: #F0707A;
+    --destructive: #F0707A;
+    --destructive-border: #F0707A;
+  }
+  .ds-a .ds-head h2 { font-size: 30px; line-height: 36px; font-weight: 600; }
+  .ds-a .t-display { font-size: 28px; line-height: 34px; font-weight: 600; }
+  .ds-a .t-body { font-size: 16px; line-height: 24px; }
+
+  .card-a {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .card-a .ruled {
+    position: relative;
+    padding: 24px 20px 24px 60px;
+    line-height: 24px;
+    background-image: repeating-linear-gradient(to bottom, transparent 0 23px, var(--rule) 23px 24px);
+  }
+  /* La marge rouge n'apparaît que lorsqu'une relance est due. */
+  .card-a.is-due .ruled::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 42px;
+    width: 2px;
+    background: var(--relance);
+  }
+  .card-a h4 { margin: 0; font-family: var(--font-head); font-size: 22px; line-height: 24px; font-weight: 600; }
+  .card-a .role { margin: 0 0 24px; color: var(--muted-fg); }
+  .card-a dl { margin: 0 0 24px; }
+  .card-a dl div { display: grid; grid-template-columns: 124px 1fr; }
+  .card-a dt { font-size: 14px; color: var(--muted-fg); }
+  .card-a dd { margin: 0; }
+  .card-a .due dd { color: var(--relance); font-weight: 700; }
+  .card-a .note { margin: 0; font-family: var(--font-head); font-style: italic; font-size: 16px; }
+  .card-a footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px 20px 12px 60px;
+    border-top: 1px solid var(--border);
+    background: var(--bg);
+  }
+
+  /* ================= B. Cartouche ================= */
+  .ds-b {
+    --bg: #F1F2EF;
+    --card: #FFFFFF;
+    --fg: #1F2428;
+    --primary: #F2B300;
+    --primary-hover: #DDA300;
+    --primary-fg: #1F2428;
+    --secondary: #FFFFFF;
+    --secondary-hover: #E8EAE6;
+    --secondary-fg: #1F2428;
+    --secondary-border: #1F2428;
+    --muted: #E4E6E2;
+    --muted-fg: #5B636A;
+    --border: #C9CDC9;
+    --input: #1F2428;
+    --field-bg: #FFFFFF;
+    --ring: #1F2428;
+    --focus-border: #1F2428;
+    --focus-ring: 0 0 0 3px #F2B300;
+    --destructive: #B42318;
+    --destructive-bg: #FFFFFF;
+    --destructive-border: #B42318;
+    --radius: 2px;
+    --font-head: "IBM Plex Sans", system-ui, sans-serif;
+    --font-body: "IBM Plex Sans", system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+  /* Cartouche, sombre : l'écran de CAO, traits clairs sur fond graphite. */
+  :root[data-theme="dark"] .ds-b {
+    --bg: #1A1E21;
+    --card: #23292D;
+    --fg: #E6E8E3;
+    --primary-hover: #FFC52E;
+    --secondary: #23292D;
+    --secondary-hover: #2E353A;
+    --secondary-fg: #E6E8E3;
+    --secondary-border: #E6E8E3;
+    --muted: #2E353A;
+    --muted-fg: #A2AAB0;
+    --border: #3D454B;
+    --input: #E6E8E3;
+    --field-bg: #23292D;
+    --ring: #E6E8E3;
+    --focus-border: #E6E8E3;
+    --destructive: #F07063;
+    --destructive-bg: #23292D;
+    --destructive-border: #F07063;
+  }
+  .ds-b .ds-head h2 { font-size: 30px; line-height: 36px; font-weight: 600; font-stretch: 80%; }
+  .ds-b .t-display { font-size: 27px; line-height: 32px; font-weight: 600; font-stretch: 80%; }
+  .ds-b .t-body { font-size: 15px; line-height: 23px; }
+  .ds-b .blk-title,
+  .ds-b .t-spec dt { font-stretch: 85%; font-weight: 500; }
+  .ds-b .btn { height: 34px; border-width: 1.5px; border-color: var(--fg); font-stretch: 88%; }
+  .ds-b .btn-primary { border-color: #1F2428; }
+  .ds-b .btn-ghost { border-color: transparent; }
+  .ds-b .btn-destructive { border-color: var(--destructive-border); }
+
+  /* Champs « case de cartouche » : libellé dans la case. */
+  .ds-b .field {
+    align-self: start;
+    gap: 0;
+    padding: 6px 10px 6px;
+    background: var(--field-bg);
+    border: 1.5px solid var(--input);
+    border-radius: var(--radius);
+  }
+  .ds-b .field label { font-size: 12px; line-height: 16px; font-weight: 500; color: var(--muted-fg); font-stretch: 85%; }
+  .ds-b .field input,
+  .ds-b .field select {
+    height: 26px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background-color: transparent;
+    font-weight: 500;
+  }
+  .ds-b .field select { padding-right: 22px; background-position: right 2px center; }
+  .ds-b .field input:focus,
+  .ds-b .field select:focus,
+  .ds-b .field .is-focus { box-shadow: none; }
+  .ds-b .field:focus-within,
+  .ds-b .field:has(.is-focus) { box-shadow: var(--focus-ring); }
+  .ds-b .field:has([aria-invalid="true"]) { border-color: var(--destructive); }
+  .ds-b .field .err { margin-top: 2px; }
+
+  .card-b {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--fg);
+    border: 2px solid var(--fg);
+    border-radius: var(--radius);
+  }
+  .card-b .cell { min-width: 0; padding: 8px 10px 10px; background: var(--card); }
+  .card-b .lbl { display: block; font-size: 12px; line-height: 16px; font-weight: 500; color: var(--muted-fg); font-stretch: 85%; }
+  .card-b .big { display: block; margin: 0; font-size: 22px; line-height: 28px; font-weight: 600; font-stretch: 82%; }
+  .card-b .sub { display: block; font-size: 14px; line-height: 20px; }
+  .card-b .val { display: block; font-weight: 500; }
+  .card-b .c-name { grid-column: span 2; }
+  .card-b .c-due { background: var(--primary); color: var(--primary-fg); }
+  .card-b .c-due .lbl { color: var(--primary-fg); }
+  .card-b .c-due .val { font-weight: 700; }
+  .card-b .c-note,
+  .card-b .c-actions { grid-column: 1 / -1; }
+  .card-b .c-note p { margin: 0; }
+  .card-b .c-actions { display: flex; flex-wrap: wrap; gap: 8px; background: var(--bg); }
+
+  /* ================= C. Température ================= */
+  .ds-c {
+    --bg: #F5F7F6;
+    --card: #FFFFFF;
+    --fg: #17302A;
+    --primary: #1E6B52;
+    --primary-hover: #175843;
+    --primary-fg: #FFFFFF;
+    --secondary: #E3EFE9;
+    --secondary-hover: #D5E7DE;
+    --secondary-fg: #1E6B52;
+    --secondary-border: transparent;
+    --muted: #EAF0ED;
+    --muted-fg: #5C6E68;
+    --border: #DCE4E0;
+    --input: #849790;
+    --field-bg: #FFFFFF;
+    --ring: #1E6B52;
+    --focus-border: #1E6B52;
+    --focus-ring: 0 0 0 4px rgb(30 107 82 / 0.18);
+    --destructive: #B3261E;
+    --destructive-bg: #FBE9E7;
+    --destructive-border: transparent;
+    --froid: #3D72A8;
+    --tiede: #D9A21B;
+    --tiede-fg: #8A6200;
+    --tiede-bg: #FFF4D9;
+    --chaud: #C73B30;
+    --track: #E1E8E5;
+    --radius: 12px;
+    --font-head: "Figtree", system-ui, sans-serif;
+    --font-body: "Figtree", system-ui, sans-serif;
+  }
+  /* Température, sombre : la forêt la nuit, températures éclaircies pour rester lisibles. */
+  :root[data-theme="dark"] .ds-c {
+    --bg: #12201C;
+    --card: #192B26;
+    --fg: #E3EEEA;
+    --primary: #5CC29C;
+    --primary-hover: #78D0AE;
+    --primary-fg: #0C2A1F;
+    --secondary: #1F3A31;
+    --secondary-hover: #26463B;
+    --secondary-fg: #8FDCBD;
+    --muted: #213530;
+    --muted-fg: #9BB0A8;
+    --border: #2A3E37;
+    --input: #64807A;
+    --field-bg: #192B26;
+    --ring: #5CC29C;
+    --focus-border: #5CC29C;
+    --focus-ring: 0 0 0 4px rgb(92 194 156 / 0.25);
+    --destructive: #F28B82;
+    --destructive-bg: #3A1F1C;
+    --froid: #6FA3DB;
+    --tiede: #E2B23A;
+    --tiede-fg: #F0CB6A;
+    --tiede-bg: #3A3013;
+    --chaud: #EE7468;
+    --track: #2A3E37;
+  }
+  .ds-c .ds-head h2 { font-size: 30px; line-height: 36px; font-weight: 700; letter-spacing: -0.01em; }
+  .ds-c .t-display { font-size: 27px; line-height: 33px; font-weight: 700; letter-spacing: -0.01em; }
+  .ds-c .t-body { font-size: 16px; line-height: 26px; }
+  .ds-c .btn { height: 40px; padding: 0 18px; border-radius: 999px; }
+  .ds-c .field input,
+  .ds-c .field select { height: 44px; padding: 0 14px; }
+  .ds-c .field select { padding-right: 36px; background-position: right 14px center; }
+
+  .card-c {
+    padding: 20px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+  }
+  .card-c header { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 12px; align-items: center; }
+  .avatar {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    font-size: 15px;
+    font-weight: 700;
+    background: var(--tiede-bg);
+    color: var(--tiede-fg);
+  }
+  .card-c h4 { margin: 0; font-size: 18px; line-height: 24px; font-weight: 700; }
+  .card-c header p { margin: 0; font-size: 14px; line-height: 20px; color: var(--muted-fg); }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 10px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 600;
+    background: var(--tiede-bg);
+    color: var(--tiede-fg);
+  }
+  .chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--tiede); }
+  .track { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin: 20px 0 8px; }
+  .seg { height: 8px; border-radius: 999px; background: var(--track); }
+  .seg.froid { background: var(--froid); }
+  .seg.tiede { background: var(--tiede); }
+  .track-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 14px; }
+  .track-row p { margin: 0; font-size: 14px; color: var(--muted-fg); }
+  .track-row strong { color: var(--fg); font-weight: 600; }
+  .ds-c .track-row .btn { height: 32px; padding: 0 12px; font-size: 13px; }
+  .card-c .note { margin: 0 0 16px; }
+  .due-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 12px 12px 16px;
+    border-radius: 14px;
+    background: var(--secondary);
+  }
+  .due-row strong { display: block; font-weight: 700; }
+  .due-row span { font-size: 13px; color: var(--muted-fg); }
+
+  /* ---------- Mobile ---------- */
+  @media (max-width: 1080px) {
+    .systems { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; row-gap: 16px; }
+    .ds { grid-row: auto; display: block; }
+  }
+  @media (max-width: 480px) {
+    .intro { padding: 28px 16px 20px; }
+    .systems { padding: 0 8px 32px; }
+    .ds { padding: 24px 16px 28px; }
+    .fields { grid-template-columns: minmax(0, 1fr); }
+    .card-a .ruled { padding-left: 48px; }
+    .card-a.is-due .ruled::before { left: 32px; }
+    .card-a footer { padding-left: 48px; }
+    .card-a dl div { grid-template-columns: 112px 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header class="intro">
+  <h1>Trois design systems pour Pipeline</h1>
+  <p>Chaque colonne montre le même contenu : couleurs, typographie, boutons, champs et carte de contact, en clair et en sombre. Le système retenu remplacera les variables du thème shadcn dans <code>src/app/globals.css</code> et les polices dans <code>src/app/layout.tsx</code>.</p>
+</header>
+
+<div class="theme-switch" role="group" aria-label="Thème">
+  <button type="button" data-set-theme="light" aria-pressed="false">Clair</button>
+  <button type="button" data-set-theme="dark" aria-pressed="false">Sombre</button>
+</div>
+
+<main class="systems">
+
+  <!-- ===================== A. Fiche ===================== -->
+  <section class="ds ds-a" aria-labelledby="a-titre">
+    <header class="blk ds-head">
+      <h2 id="a-titre">Fiche</h2>
+      <p>Le fichier bristol du commercial : de l'encre bleue sur du papier ligné. La marge rouge n'apparaît que sur les contacts à relancer.</p>
+    </header>
+
+    <div class="blk">
+      <h3 class="blk-title">Couleurs</h3>
+      <ul class="swatches">
+        <li><div class="sw-chip" style="--c:var(--bg)"></div><span class="sw-name">Papier</span><span class="sw-meta"><code>background</code> <span class="hex-l">#F6F7F9</span><span class="hex-d">#141B2B</span></span></li>
+        <li><div class="sw-chip" style="--c:var(--fg)"></div><span class="sw-name">Encre</span><span class="sw-meta"><code>foreground</code> <span class="hex-l">#1B2433</span><span class="hex-d">#E6EAF2</span></span></li>
+        <li><div class="sw-chip" style="--c:var(--primary)"></div><span class="sw-name">Bleu encre</span><span class="sw-meta"><code>primary</code> <span class="hex-l">#24408E</span><span class="hex-d">#8AA4EE</span></span></li>
+        <li><div class="sw-chip" style="--c:var(--muted-fg)"></div><span class="sw-name">Crayon</span><span class="sw-meta"><code>muted-foreground</code> <span class="hex-l">#5A6578</span><span class="hex-d">#A3ADC0</span></span></li>
+        <li><div class="sw-chip" style="--c:var(--border)"></div><span class="sw-name">Ligne</span><span class="sw-meta"><code>border</code> <span class="hex-l">#D5DCE6</span><span class="hex-d">#2E3A52</span></span></li>
+        <li><div class="sw-chip" style="--c:var(--relance)"></div><span class="sw-name">Marge rouge</span><span class="sw-meta"><code>relance</code> <span class="hex-l">#C42E3A</span><span class="hex-d">#F0707A</span></span></li>
+      </ul>
+    </div>
+
+    <div class="blk">
+      <h3 class="blk-title">Typographie</h3>
+      <p class="t-display">Qui relancer aujourd'hui</p>
+      <p class="t-body">Trois contacts attendent une réponse. Commencez par ceux dont la proposition date de plus d'une semaine.</p>
+      <p class="t-small">Dernier échange le 4 novembre</p>
+      <dl class="t-spec">
+        <dt>Titres, noms, notes</dt><dd>Spectral 600 et italique 400</dd>
+        <dt>Interface</dt><dd>Source Sans 3, 400 et 600</dd>
+        <dt>Rayon</dt><dd>4 px</dd>
+      </dl>
+    </div>
+
+    <div class="blk">
+      <h3 class="blk-title">Boutons</h3>
+      <div class="btns">
+        <button class="btn btn-primary" type="button">Ajouter un contact</button>
+        <button class="btn btn-secondary" type="button">Planifier la relance</button>
+        <button class="btn btn-ghost" type="button">Annuler</button>
+        <button class="btn btn-destructive" type="button">Supprimer</button>
+        <button class="btn btn-primary" type="button" disabled>Enregistrer</button>
+      </div>
+    </div>
+
+    <div class="blk">
+      <h3 class="blk-title">Champs</h3>
+      <div class="fields">
+        <div class="field"><label for="a-nom">Nom</label><input id="a-nom" type="text" value="Claire Vasseur"></div>
+        <div class="field"><label for="a-ent">Entreprise</label><input id="a-ent" class="is-focus" type="text" value="Ateliers Vernier"></div>
+        <div class="field"><label for="a-etape">Étape</label>
+          <select id="a-etape"><option>À contacter</option><option>Premier échange</option><option selected>Démo planifiée</option><option>Proposition envoyée</option><option>Gagné</option></select>
+        </div>
+        <div class="field"><label for="a-date">Date de relance</label><input id="a-date" type="text" value="12/11/2026" aria-invalid="true" aria-describedby="a-date-err"><span class="err" id="a-date-err">La relance doit tomber aujourd'hui ou plus tard.</span></div>
+      </div>
+    </div>
+
+    <div class="blk">
+      <h3 class="blk-title">Carte de contact</h3>
+      <article class="card-a is-due">
+        <div class="ruled">
+          <h4>Claire Vasseur</h4>
+          <p class="role">Responsable PLM, Ateliers Vernier</p>
+          <dl>
+            <div><dt>Étape</dt><dd>Démo planifiée</dd></div>
+            <div><dt>Dernier échange</dt><dd>4 nov., appel de découverte</dd></div>
+            <div class="due"><dt>Relance</dt><dd>Aujourd'hui</dd></div>
+          </dl>
+          <p class="note">Veut migrer ses nomenclatures avant l'audit de juin.</p>
+        </div>
+        <footer>
+          <button class="btn btn-primary" type="button">Marquer comme relancé</button>
+          <button class="btn btn-ghost" type="button">Changer d'étape</button>
+        </footer>
+      </article>
+    </div>
+  </section>
+
+  <!-- ===================== B. Cartouche ===================== -->
+  <section class="ds ds-b" aria-labelledby="b-titre">
+    <header class="blk ds-head">
+      <h2 id="b-titre">Cartouche</h2>
+      <p>Le cartouche d'un plan technique : des cases, des traits francs, des dates ISO. Le jaune de signalisation est réservé à l'action et aux relances du jour.</p>
+    </header>
+
+    <div class="blk">
+      <h3 class="blk-title">Couleurs</h3>
+      <ul class="swatches">
+        <li><div class="sw-chip" style="--c:var(--bg)"></div><span class="sw-name">Calque</span><span class="sw-meta"><code>background</code> <span class="hex-l">#F1F2EF</span><span class="hex-d">#1A1E21</span></span></li>
+        <li><div class="sw-chip" style="--c:var(--fg)"></div><span class="sw-name">Graphite</span><span class="sw-meta"><code>foreground</code> <span class="hex-l">#1F2428</span><span class="hex-d">#E6E8E3</span></span></li>
+        <li><div class="sw-chip" style="--c:var(--primary)"></div><span class="sw-name">Jaune signal</span><span class="sw-meta"><code>primary</code> #F2B300</span></li>
+        <li><div class="sw-chip" style="--c:var(--muted-fg)"></div><span class="sw-name">Mine grise</span><span class="sw-meta"><code>muted-foreground</code> <span class="hex-l">#5B636A</span><span class="hex-d">#A2AAB0</span></span></li>
+        <li><div class="sw-chip" style="--c:var(--border)"></div><span class="sw-name">Trait fin</span><span class="sw-meta"><code>border</code> <span class="hex-l">#C9CDC9</span><span class="hex-d">#3D454B</span></span></li>
+        <li><div class="sw-chip" style="--c:var(--destructive)"></div><span class="sw-name">Rouge arrêt</span><span class="sw-meta"><code>destructive</code> <span class="hex-l">#B42318</span><span class="hex-d">#F07063</span></span></li>
+      </ul>
+    </div>
+
+    <div class="blk">
+      <h3 class="blk-title">Typographie</h3>
+      <p class="t-display">Qui relancer aujourd'hui</p>
+      <p class="t-body">Trois contacts attendent une réponse. Commencez par ceux dont la proposition date de plus d'une semaine.</p>
+      <p class="t-small">Dernier échange le 2026-11-04</p>
+      <dl class="t-spec">
+        <dt>Titres, libellés</dt><dd>IBM Plex Sans étroit (largeur 80 %), 600</dd>
+        <dt>Interface</dt><dd>IBM Plex Sans, 400 et 500, chiffres tabulaires</dd>
+        <dt>Rayon</dt><dd>2 px, traits de 1,5 px</dd>
+      </dl>
+    </div>
+
+    <div class="blk">
+      <h3 class="blk-title">Boutons</h3>
+      <div class="btns">
+        <button class="btn btn-primary" type="button">Ajouter un contact</button>
+        <button class="btn btn-secondary" type="button">Planifier la relance</button>
+        <button class="btn btn-ghost" type="button">Annuler</button>
+        <button class="btn btn-destructive" type="button">Supprimer</button>
+        <button class="btn btn-primary" type="button" disabled>Enregistrer</button>
+      </div>
+    </div>
+
+    <div class="blk">
+      <h3 class="blk-title">Champs</h3>
+      <div class="fields">
+        <div class="field"><label for="b-nom">Nom</label><input id="b-nom" type="text" value="Claire Vasseur"></div>
+        <div class="field"><label for="b-ent">Entreprise</label><input id="b-ent" class="is-focus" type="text" value="Ateliers Vernier"></div>
+        <div class="field"><label for="b-etape">Étape</label>
+          <select id="b-etape"><option>À contacter</option><option>Premier échange</option><option selected>Démo planifiée</option><option>Proposition envoyée</option><option>Gagné</option></select>
+        </div>
+        <div class="field"><label for="b-date">Date de relance</label><input id="b-date" type="text" value="2026-11-12" aria-invalid="true" aria-describedby="b-date-err"><span class="err" id="b-date-err">La relance doit tomber aujourd'hui ou plus tard.</span></div>
+      </div>
+    </div>
+
+    <div class="blk">
+      <h3 class="blk-title">Carte de contact</h3>
+      <article class="card-b">
+        <div class="cell c-name"><span class="lbl">Contact</span><h4 class="big">Claire Vasseur</h4><span class="sub">Responsable PLM</span></div>
+        <div class="cell"><span class="lbl">Étape</span><span class="big">3/5</span><span class="sub">Démo planifiée</span></div>
+        <div class="cell"><span class="lbl">Entreprise</span><span class="val">Ateliers Vernier</span></div>
+        <div class="cell"><span class="lbl">Dernier échange</span><span class="val">2026-11-04</span></div>
+        <div class="cell c-due"><span class="lbl">Relance</span><span class="val">Aujourd'hui</span></div>
+        <div class="cell c-note"><span class="lbl">Note</span><p>Veut migrer ses nomenclatures avant l'audit de juin.</p></div>
+        <div class="cell c-actions">
+          <button class="btn btn-primary" type="button">Marquer comme relancé</button>
+          <button class="btn btn-ghost" type="button">Changer d'étape</button>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ===================== C. Température ===================== -->
+  <section class="ds ds-c" aria-labelledby="c-titre">
+    <header class="blk ds-head">
+      <h2 id="c-titre">Température</h2>
+      <p>Chaque contact a une température, du froid au signé. La couleur dit où il en est, la piste dit ce qu'il reste à faire.</p>
+    </header>
+
+    <div class="blk">
+      <h3 class="blk-title">Couleurs</h3>
+      <ul class="swatches">
+        <li><div class="sw-chip" style="--c:var(--bg)"></div><span class="sw-name">Brume</span><span class="sw-meta"><code>background</code> <span class="hex-l">#F5F7F6</span><span class="hex-d">#12201C</span></span></li>
+        <li><div class="sw-chip" style="--c:var(--fg)"></div><span class="sw-name">Sapin nuit</span><span class="sw-meta"><code>foreground</code> <span class="hex-l">#17302A</span><span class="hex-d">#E3EEEA</span></span></li>
+        <li><div class="sw-chip" style="--c:var(--primary)"></div><span class="sw-name">Sapin</span><span class="sw-meta"><code>primary</code>, signé <span class="hex-l">#1E6B52</span><span class="hex-d">#5CC29C</span></span></li>
+        <li><div class="sw-chip" style="--c:var(--froid)"></div><span class="sw-name">Froid</span><span class="sw-meta">à contacter <span class="hex-l">#3D72A8</span><span class="hex-d">#6FA3DB</span></span></li>
+        <li><div class="sw-chip" style="--c:var(--tiede)"></div><span class="sw-name">Tiède</span><span class="sw-meta">démo <span class="hex-l">#D9A21B</span><span class="hex-d">#E2B23A</span></span></li>
+        <li><div class="sw-chip" style="--c:var(--chaud)"></div><span class="sw-name">Chaud</span><span class="sw-meta">proposition <span class="hex-l">#C73B30</span><span class="hex-d">#EE7468</span></span></li>
+      </ul>
+    </div>
+
+    <div class="blk">
+      <h3 class="blk-title">Typographie</h3>
+      <p class="t-display">Qui relancer aujourd'hui</p>
+      <p class="t-body">Trois contacts attendent une réponse. Commencez par ceux dont la proposition date de plus d'une semaine.</p>
+      <p class="t-small">Dernier échange le 4 novembre</p>
+      <dl class="t-spec">
+        <dt>Tout</dt><dd>Figtree, 400, 600 et 700</dd>
+        <dt>Corps</dt><dd>16 px, interligne 26 px</dd>
+        <dt>Rayon</dt><dd>12 px, boutons en pilule</dd>
+      </dl>
+    </div>
+
+    <div class="blk">
+      <h3 class="blk-title">Boutons</h3>
+      <div class="btns">
+        <button class="btn btn-primary" type="button">Ajouter un contact</button>
+        <button class="btn btn-secondary" type="button">Planifier la relance</button>
+        <button class="btn btn-ghost" type="button">Annuler</button>
+        <button class="btn btn-destructive" type="button">Supprimer</button>
+        <button class="btn btn-primary" type="button" disabled>Enregistrer</button>
+      </div>
+    </div>
+
+    <div class="blk">
+      <h3 class="blk-title">Champs</h3>
+      <div class="fields">
+        <div class="field"><label for="c-nom">Nom</label><input id="c-nom" type="text" value="Claire Vasseur"></div>
+        <div class="field"><label for="c-ent">Entreprise</label><input id="c-ent" class="is-focus" type="text" value="Ateliers Vernier"></div>
+        <div class="field"><label for="c-etape">Étape</label>
+          <select id="c-etape"><option>À contacter</option><option>Premier échange</option><option selected>Démo planifiée</option><option>Proposition envoyée</option><option>Gagné</option></select>
+        </div>
+        <div class="field"><label for="c-date">Date de relance</label><input id="c-date" type="text" value="12/11/2026" aria-invalid="true" aria-describedby="c-date-err"><span class="err" id="c-date-err">La relance doit tomber aujourd'hui ou plus tard.</span></div>
+      </div>
+    </div>
+
+    <div class="blk">
+      <h3 class="blk-title">Carte de contact</h3>
+      <article class="card-c">
+        <header>
+          <span class="avatar" aria-hidden="true">CV</span>
+          <div><h4>Claire Vasseur</h4><p>Responsable PLM, Ateliers Vernier</p></div>
+          <span class="chip"><span class="dot"></span>Tiède</span>
+        </header>
+        <div class="track" role="img" aria-label="Étape 3 sur 5">
+          <span class="seg froid"></span><span class="seg froid"></span><span class="seg tiede"></span><span class="seg"></span><span class="seg"></span>
+        </div>
+        <div class="track-row">
+          <p><strong>Démo planifiée</strong>, étape 3 sur 5</p>
+          <button class="btn btn-ghost" type="button">Changer d'étape</button>
+        </div>
+        <p class="note">Veut migrer ses nomenclatures avant l'audit de juin.</p>
+        <div class="due-row">
+          <div><strong>À relancer aujourd'hui</strong><span>Dernier échange le 4 nov.</span></div>
+          <button class="btn btn-primary" type="button">Marquer comme relancé</button>
+        </div>
+      </article>
+    </div>
+  </section>
+
+</main>
+
+<script>
+  (function () {
+    var root = document.documentElement;
+    var buttons = document.querySelectorAll("[data-set-theme]");
+    function sync() {
+      buttons.forEach(function (b) {
+        b.setAttribute("aria-pressed", String(b.dataset.setTheme === root.dataset.theme));
+      });
+    }
+    buttons.forEach(function (b) {
+      b.addEventListener("click", function () {
+        root.dataset.theme = b.dataset.setTheme;
+        try { localStorage.setItem("pipeline-ds-theme", root.dataset.theme); } catch (e) {}
+        sync();
+      });
+    });
+    sync();
+  })();
+</script>
+</body>
+</html>
