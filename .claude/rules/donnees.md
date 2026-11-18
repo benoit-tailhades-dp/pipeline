@@ -22,7 +22,9 @@ Fichiers : `src/data/`. C'est la seule couche qui parle à la base.
 
 ## Tests
 
+- Les tests vont dans `src/data/__test__/`.
 - Tester contre `createDb(":memory:")`, avec une base neuve pour chaque test (`beforeEach`), fermée dans `afterEach`.
+- Exception : un test de persistance après redémarrage utilise un fichier SQLite dans un dossier temporaire, puisqu'une base `:memory:` disparaît à la fermeture.
 - Tester le contrat de l'interface : ce qu'on écrit se relit, et les critères filtrent bien.
 
 ## Comment vérifier

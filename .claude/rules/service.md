@@ -19,8 +19,8 @@ Fichiers : `src/services/`. Cette couche porte toutes les règles métier de Pip
 ## Tests d'abord
 
 Pour chaque règle, dans cet ordre :
-1. Écrire le test dans `xxx-service.test.ts`, à côté du service.
-2. Le lancer (`pnpm exec vitest run src/services/xxx-service.test.ts`) et le voir échouer pour la bonne raison : une assertion fausse, pas un import manquant.
+1. Écrire le test dans `src/services/__test__/xxx-service.test.ts`.
+2. Le lancer (`pnpm exec vitest run src/services/__test__/xxx-service.test.ts`) et le voir échouer pour la bonne raison : une assertion fausse, pas un import manquant.
 3. Écrire le code minimal qui le fait passer, puis nettoyer.
 
 - Écrire un test par règle, plus les cas limites (une relance aujourd'hui est valide, une relance hier est refusée).
@@ -33,6 +33,6 @@ Pour chaque règle, dans cet ordre :
 2. Chaque nouveau test a été vu en échec avant l'implémentation : le compte rendu doit le dire.
 3. Chaque service a son test : la commande ne doit rien afficher avant « (fin) ».
    ```sh
-   for f in src/services/*.ts; do case $f in *.test.ts) ;; *) [ -f "${f%.ts}.test.ts" ] || echo "sans test : $f";; esac; done; echo "(fin)"
+   for f in src/services/*.ts; do [ -f "src/services/__test__/$(basename "${f%.ts}").test.ts" ] || echo "sans test : $f"; done; echo "(fin)"
    ```
 4. `pnpm lint` doit passer. Il bloque `next/*`, `react`, `react-dom`, `@libsql/client`, les imports de valeur depuis `@/data/*` et les couches supérieures.

@@ -27,7 +27,7 @@ Fichiers : `src/app/` (routes, Server Components, Server Actions) et `src/compon
 
 ## Tests
 
-Seuls les composants synchrones se testent, avec Testing Library. Le test va dans un `*.test.tsx` à côté du composant (projet Vitest `dom`).
+Seuls les composants synchrones se testent, avec Testing Library. Le test va dans un `*.test.tsx` du dossier `__test__` placé à côté du composant (projet Vitest `dom`).
 
 ## Comment vérifier
 

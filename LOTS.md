@@ -10,7 +10,7 @@ Dans les exemples, on est le 18 novembre 2026. Les étapes sont, dans l'ordre : 
 
 ## Lot 1 : Ajouter un contact
 
-Statut : à faire
+Statut : livré
 
 **Parcours.** Sur l'accueil, je saisis le nom d'un contact (obligatoire) et son entreprise (facultative), puis je valide. Le contact apparaît en tête de la liste, et il y est encore après un redémarrage de l'app.
 

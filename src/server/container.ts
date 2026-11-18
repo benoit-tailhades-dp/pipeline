@@ -1,8 +1,9 @@
 import "server-only";
 
 import { createDb, type Db } from "@/data/db";
-import { createLibsqlExempleRepository } from "@/data/libsql-exemple-repository";
-import { createExempleService } from "@/services/exemple-service";
+import { createLibsqlContactRepository } from "@/data/libsql-contact-repository";
+import { appliquerSchema } from "@/data/schema";
+import { createContactService } from "@/services/contact-service";
 
 /**
  * Point d'assemblage : seul endroit qui relie les services aux implémentations de données.
@@ -20,14 +21,27 @@ function databaseUrl(): string {
   return "file:local.db";
 }
 
-// Ouverture différée : importer ce module (au build notamment) n'ouvre pas la base.
-let db: Db | undefined;
-
-function getDb(): Db {
-  db ??= createDb(databaseUrl(), process.env.DATABASE_AUTH_TOKEN);
+async function ouvrir(): Promise<Db> {
+  const db = createDb(databaseUrl(), process.env.DATABASE_AUTH_TOKEN);
+  await appliquerSchema(db);
   return db;
 }
 
-export function exempleService() {
-  return createExempleService(createLibsqlExempleRepository(getDb()));
+// Ouverture différée : importer ce module (au build notamment) n'ouvre pas la base.
+// Le schéma est appliqué une fois ; en cas d'échec, le prochain appel réessaie.
+let db: Promise<Db> | undefined;
+
+function getDb(): Promise<Db> {
+  db ??= ouvrir().catch((erreur: unknown) => {
+    db = undefined;
+    throw erreur;
+  });
+  return db;
+}
+
+export async function contactService() {
+  return createContactService({
+    contacts: createLibsqlContactRepository(await getDb()),
+    now: () => new Date(),
+  });
 }

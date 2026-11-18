@@ -1,6 +1,9 @@
-import { createClient, type Client } from "@libsql/client";
+import { createClient, type Client, type Row } from "@libsql/client";
 
 export type Db = Client;
+
+/** Ligne brute renvoyée par une requête : à convertir en objet du domaine dans le repository. */
+export type Ligne = Row;
 
 /**
  * Seul point d'entrée vers le client SQL.

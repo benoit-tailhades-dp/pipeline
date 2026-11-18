@@ -17,7 +17,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## État du projet
 
-Les trois couches existent avec un exemple vide (`exemple-*`, `statut-base`) qui vérifie la connexion à la base de bout en bout. Aucune fonctionnalité métier n'est encore écrite. Ces exemples sont à remplacer.
+Lot 1 livré : ajout et liste des contacts sur l'accueil (`contact-repository`, `contact-service`, `src/components/contacts/`, Server Action dans `src/app/actions.ts`). Le schéma est dans `src/data/schema.ts`, appliqué par le container à la première ouverture de la base.
 
 Le découpage en lots, avec les critères d'acceptation et le statut de chaque lot, est dans `LOTS.md`.
 
@@ -32,7 +32,7 @@ Le découpage en lots, avec les critères d'acceptation et le statut de chaque l
 
 ## Tests
 
-- Vitest 5 avec deux projets (`vitest.config.mts`) : `node` pour tout `src/` hors présentation, `jsdom` pour `src/app/**` et `src/components/**`. Les fichiers de test sont placés à côté du code (`*.test.ts(x)`).
+- Vitest 5 avec deux projets (`vitest.config.mts`) : `node` pour tout `src/` hors présentation, `jsdom` pour `src/app/**` et `src/components/**`. Les fichiers de test (`*.test.ts(x)`) sont dans un dossier `__test__` placé à côté du code testé.
 - Données : tester contre `createDb(":memory:")`. Service : passer un faux repository qui implémente l'interface. Présentation : Testing Library, uniquement sur des composants synchrones (Vitest ne gère pas les Server Components async).
 - Les chemins `@/*` sont résolus nativement par Vite 8 (`resolve.tsconfigPaths`) : pas besoin de `vite-tsconfig-paths`.
 
