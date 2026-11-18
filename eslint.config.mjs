@@ -57,6 +57,10 @@ const eslintConfig = defineConfig([
               message: "La couche service ne dépend pas de Next.",
             },
             {
+              group: ["react", "react/*", "react-dom", "react-dom/*"],
+              message: "La couche service ne dépend pas de React.",
+            },
+            {
               group: ["@/data/*"],
               allowTypeImports: true,
               message: "La couche service ne consomme que des interfaces de données (import type).",
