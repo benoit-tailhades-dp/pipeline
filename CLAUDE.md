@@ -19,6 +19,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Les trois couches existent avec un exemple vide (`exemple-*`, `statut-base`) qui vérifie la connexion à la base de bout en bout. Aucune fonctionnalité métier n'est encore écrite. Ces exemples sont à remplacer.
 
+Le découpage en lots, avec les critères d'acceptation et le statut de chaque lot, est dans `LOTS.md`.
+
 ## Organisation des couches
 
 - **Présentation** : `src/app/`, `src/components/`. Elle obtient les services via `@/server/container`, jamais via `@/data`.
