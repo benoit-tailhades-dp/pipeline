@@ -21,6 +21,14 @@ Lot 1 livré : ajout et liste des contacts sur l'accueil (`contact-repository`, 
 
 Lot 2 livré : étapes du pipeline. Le service porte l'ordre des étapes et leur température (`etapes()`, `avancer`, `changerEtape`) et renvoie des `ContactSuivi` (température, position, étape suivante). La carte est `src/components/contacts/carte-contact.tsx` : elle reçoit ses Server Actions en props pour rester testable. Une colonne ajoutée à une table existante passe par `ajouterColonneAbsente` dans `schema.ts`, pour migrer les bases déjà créées.
 
+Lot 3 livré : relance planifiée sur la carte (`RelanceContact`). Les dates du calendrier sont des chaînes `AAAA-MM-JJ` (`DateCalendrier`), comparables telles quelles. « Aujourd'hui » se calcule dans le service avec `dateDuJour(now(), fuseau)` (`src/services/dates.ts`, fuseau `Europe/Paris` par défaut). La présentation formate avec `src/components/contacts/dates.ts`. Les Server Actions de la carte passent dans une seule prop `actions` (`ActionsContact`). Les requêtes SQL du repository sont des constantes en tête de fichier.
+
+Lot 4 livré : section « À relancer aujourd’hui » en tête de l'accueil (`ListeARelancer`). Le repository renvoie les relances dues jusqu'à une date (`listerRelancesJusquAu`), le service fixe cette date à aujourd'hui, calcule le `retard` en jours (`joursEntre`) et trie du plus en retard au plus récent. Dans le JSX, l'apostrophe est typographique (’) : ESLint refuse l'apostrophe droite (`react/no-unescaped-entities`).
+
+Lot 5 livré : « Marquer comme relancé » dans « À relancer aujourd’hui » (`MarquerRelance`). Le service enregistre l'échange du jour (`marquerRelance` puis `enregistrerEchange` dans le repository). Sans note saisie, la note précédente est gardée. Sans relance suivante, aucune relance n'est planifiée. Une relance suivante doit tomber après aujourd'hui. La carte affiche la note et « Dernier échange : … » à partir de `joursDepuisDernierEchange`.
+
+Lot 6 livré : depuis la carte, « Modifier » ouvre la fiche (`FicheContact` : nom, entreprise, fonction, e-mail, téléphone) et « Supprimer » demande une confirmation dans la carte, sans boîte de dialogue. Le service valide le nom et la forme de l'e-mail (`modifier`). Le formulaire est en `noValidate` pour que ce soit le message du service qui s'affiche.
+
 Le découpage en lots, avec les critères d'acceptation et le statut de chaque lot, est dans `LOTS.md`.
 
 ## Organisation des couches

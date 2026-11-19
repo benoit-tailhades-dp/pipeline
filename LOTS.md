@@ -36,7 +36,7 @@ Statut : livré
 
 ## Lot 3 : Planifier une relance
 
-Statut : à faire
+Statut : livré
 
 **Parcours.** Sur la carte d'un contact, je choisis une date de relance, que la carte affiche ensuite. Une date passée est refusée. Je peux aussi modifier ou retirer la relance.
 
@@ -48,7 +48,7 @@ Statut : à faire
 
 ## Lot 4 : Voir qui relancer aujourd'hui
 
-Statut : à faire
+Statut : livré
 
 **Parcours.** L'accueil s'ouvre sur « À relancer aujourd'hui » : les contacts dont la relance tombe aujourd'hui ou est en retard, les plus en retard en premier. La liste de tous les contacts vient en dessous.
 
@@ -60,7 +60,7 @@ Statut : à faire
 
 ## Lot 5 : Marquer un contact comme relancé
 
-Statut : à faire
+Statut : livré
 
 **Parcours.** Depuis « À relancer aujourd'hui », je marque un contact comme relancé. Je peux ajouter une note sur l'échange et planifier la relance suivante. Le contact sort alors de la liste du jour.
 
@@ -72,7 +72,7 @@ Statut : à faire
 
 ## Lot 6 : Modifier ou supprimer un contact
 
-Statut : à faire
+Statut : livré
 
 **Parcours.** J'ouvre un contact pour compléter ou corriger ses informations : nom, entreprise, fonction, e-mail, téléphone. Je peux aussi le supprimer, après une confirmation.
 

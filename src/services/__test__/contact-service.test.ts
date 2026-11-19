@@ -10,7 +10,16 @@ function fauxRepository(): ContactRepository {
   let prochainId = 1;
   return {
     async ajouter(nouveau) {
-      const contact = { id: prochainId++, ...nouveau };
+      const contact: Contact = {
+        id: prochainId++,
+        fonction: null,
+        email: null,
+        telephone: null,
+        relanceLe: null,
+        dernierEchangeLe: null,
+        note: null,
+        ...nouveau,
+      };
       contacts.push(contact);
       return { ...contact };
     },
@@ -26,6 +35,35 @@ function fauxRepository(): ContactRepository {
       if (!contact) return null;
       contact.etape = etape;
       return { ...contact };
+    },
+    async changerRelance(id, date) {
+      const contact = contacts.find((c) => c.id === id);
+      if (!contact) return null;
+      contact.relanceLe = date;
+      return { ...contact };
+    },
+    async enregistrerEchange(id, echange) {
+      const contact = contacts.find((c) => c.id === id);
+      if (!contact) return null;
+      Object.assign(contact, echange);
+      return { ...contact };
+    },
+    async modifier(id, fiche) {
+      const contact = contacts.find((c) => c.id === id);
+      if (!contact) return null;
+      Object.assign(contact, fiche);
+      return { ...contact };
+    },
+    async supprimer(id) {
+      const index = contacts.findIndex((c) => c.id === id);
+      if (index === -1) return false;
+      contacts.splice(index, 1);
+      return true;
+    },
+    async listerRelancesJusquAu(date) {
+      return contacts
+        .filter((c) => c.relanceLe !== null && c.relanceLe <= date)
+        .map((contact) => ({ ...contact }));
     },
   };
 }
@@ -241,6 +279,427 @@ describe("ContactService", () => {
 
     it("refuse un contact inconnu", async () => {
       await expect(service.changerEtape(42, "demo")).resolves.toEqual({
+        ok: false,
+        erreur: "Ce contact n'existe plus.",
+      });
+    });
+  });
+
+  describe("planifierRelance", () => {
+    // `maintenant` : le 18 novembre 2026 à 10 h, heure de Paris.
+
+    it("planifie une relance au 24 novembre", async () => {
+      const contact = await contactA("demo");
+
+      const resultat = await service.planifierRelance(contact.id, "2026-11-24");
+
+      expect(resultat).toEqual({
+        ok: true,
+        contact: expect.objectContaining({ id: contact.id, relanceLe: "2026-11-24" }),
+      });
+      await expect(repository.trouver(contact.id)).resolves.toMatchObject({
+        relanceLe: "2026-11-24",
+      });
+    });
+
+    it("refuse le 17 novembre, la veille", async () => {
+      const contact = await contactA("demo");
+
+      await expect(service.planifierRelance(contact.id, "2026-11-17")).resolves.toEqual({
+        ok: false,
+        erreur: "La relance doit tomber aujourd'hui ou plus tard.",
+      });
+      await expect(repository.trouver(contact.id)).resolves.toMatchObject({ relanceLe: null });
+    });
+
+    it("accepte le 18 novembre, aujourd'hui", async () => {
+      const contact = await contactA("demo");
+
+      const resultat = await service.planifierRelance(contact.id, "2026-11-18");
+
+      expect(resultat.ok).toBe(true);
+      await expect(repository.trouver(contact.id)).resolves.toMatchObject({
+        relanceLe: "2026-11-18",
+      });
+    });
+
+    it("compte « aujourd'hui » à l'heure de Paris", async () => {
+      // 23 h 30 UTC le 18 : il est déjà 0 h 30 le 19 à Paris.
+      maintenant = new Date("2026-11-18T23:30:00.000Z");
+      const contact = await contactA("demo");
+
+      await expect(service.planifierRelance(contact.id, "2026-11-18")).resolves.toMatchObject({
+        ok: false,
+      });
+      await expect(service.planifierRelance(contact.id, "2026-11-19")).resolves.toMatchObject({
+        ok: true,
+      });
+    });
+
+    it("remplace une relance déjà planifiée", async () => {
+      const contact = await contactA("demo");
+      await service.planifierRelance(contact.id, "2026-11-24");
+
+      await service.planifierRelance(contact.id, "2026-11-30");
+
+      await expect(repository.trouver(contact.id)).resolves.toMatchObject({
+        relanceLe: "2026-11-30",
+      });
+    });
+
+    it.each(["", "demain", "24/11/2026", "2026-02-30"])(
+      "refuse la date mal formée %j",
+      async (date) => {
+        const contact = await contactA("demo");
+
+        await expect(service.planifierRelance(contact.id, date)).resolves.toEqual({
+          ok: false,
+          erreur: "Indiquez une date de relance.",
+        });
+        await expect(repository.trouver(contact.id)).resolves.toMatchObject({ relanceLe: null });
+      },
+    );
+
+    it("refuse un contact inconnu", async () => {
+      await expect(service.planifierRelance(42, "2026-11-24")).resolves.toEqual({
+        ok: false,
+        erreur: "Ce contact n'existe plus.",
+      });
+    });
+  });
+
+  describe("retirerRelance", () => {
+    it("retire la relance planifiée", async () => {
+      const contact = await contactA("demo");
+      await service.planifierRelance(contact.id, "2026-11-24");
+
+      const resultat = await service.retirerRelance(contact.id);
+
+      expect(resultat).toEqual({
+        ok: true,
+        contact: expect.objectContaining({ id: contact.id, relanceLe: null }),
+      });
+      await expect(repository.trouver(contact.id)).resolves.toMatchObject({ relanceLe: null });
+    });
+
+    it("refuse un contact inconnu", async () => {
+      await expect(service.retirerRelance(42)).resolves.toEqual({
+        ok: false,
+        erreur: "Ce contact n'existe plus.",
+      });
+    });
+  });
+
+  describe("aRelancer", () => {
+    // `maintenant` : le 18 novembre 2026 à 10 h, heure de Paris.
+
+    async function relanceLe(nom: string, date: string | null) {
+      const contact = await repository.ajouter({
+        nom,
+        entreprise: null,
+        etape: "demo",
+        creeLe: maintenant,
+      });
+      return date ? (await repository.changerRelance(contact.id, date))! : contact;
+    }
+
+    it("contient un contact dont la relance tombe aujourd'hui, sans retard", async () => {
+      await relanceLe("Claire Vasseur", "2026-11-18");
+
+      await expect(service.aRelancer()).resolves.toEqual([
+        expect.objectContaining({
+          nom: "Claire Vasseur",
+          relanceLe: "2026-11-18",
+          retard: 0,
+          temperature: "tiede",
+        }),
+      ]);
+    });
+
+    it("place un contact en retard de 3 jours avant ceux du jour", async () => {
+      await relanceLe("Claire Vasseur", "2026-11-18");
+      await relanceLe("Marc Delorme", "2026-11-15");
+
+      const relances = await service.aRelancer();
+
+      expect(relances.map(({ nom, retard }) => ({ nom, retard }))).toEqual([
+        { nom: "Marc Delorme", retard: 3 },
+        { nom: "Claire Vasseur", retard: 0 },
+      ]);
+    });
+
+    it("classe les retards du plus ancien au plus récent", async () => {
+      await relanceLe("Claire Vasseur", "2026-11-17");
+      await relanceLe("Marc Delorme", "2026-11-08");
+      await relanceLe("Inès Garnier", "2026-11-14");
+
+      const noms = (await service.aRelancer()).map((contact) => contact.nom);
+
+      expect(noms).toEqual(["Marc Delorme", "Inès Garnier", "Claire Vasseur"]);
+    });
+
+    it("ne contient pas un contact dont la relance tombe demain", async () => {
+      await relanceLe("Claire Vasseur", "2026-11-19");
+
+      await expect(service.aRelancer()).resolves.toEqual([]);
+    });
+
+    it("ne contient pas un contact sans relance", async () => {
+      await relanceLe("Claire Vasseur", null);
+
+      await expect(service.aRelancer()).resolves.toEqual([]);
+    });
+
+    it("compte « aujourd'hui » à l'heure de Paris", async () => {
+      // 23 h 30 UTC le 18 : il est déjà 0 h 30 le 19 à Paris.
+      maintenant = new Date("2026-11-18T23:30:00.000Z");
+      await relanceLe("Claire Vasseur", "2026-11-19");
+
+      await expect(service.aRelancer()).resolves.toMatchObject([{ retard: 0 }]);
+    });
+  });
+
+  describe("marquerRelance", () => {
+    // `maintenant` : le 18 novembre 2026 à 10 h, heure de Paris.
+
+    async function contactARelancerAujourdhui() {
+      const contact = await contactA("demo");
+      await repository.changerRelance(contact.id, "2026-11-18");
+      return contact;
+    }
+
+    it("fait sortir le contact de la liste du jour et date le dernier échange d'aujourd'hui", async () => {
+      const contact = await contactARelancerAujourdhui();
+      await expect(service.aRelancer()).resolves.toHaveLength(1);
+
+      const resultat = await service.marquerRelance(contact.id, {});
+
+      expect(resultat).toEqual({
+        ok: true,
+        contact: expect.objectContaining({
+          id: contact.id,
+          dernierEchangeLe: "2026-11-18",
+          joursDepuisDernierEchange: 0,
+        }),
+      });
+      await expect(service.aRelancer()).resolves.toEqual([]);
+      await expect(service.lister()).resolves.toMatchObject([
+        { dernierEchangeLe: "2026-11-18", joursDepuisDernierEchange: 0 },
+      ]);
+    });
+
+    it("enregistre la note saisie sur l'échange", async () => {
+      const contact = await contactARelancerAujourdhui();
+
+      await service.marquerRelance(contact.id, { note: "  Rappeler après l'audit de juin " });
+
+      await expect(service.lister()).resolves.toMatchObject([
+        { note: "Rappeler après l'audit de juin" },
+      ]);
+    });
+
+    it.each([undefined, "", "   "])("garde la note précédente avec la note %j", async (note) => {
+      const contact = await contactARelancerAujourdhui();
+      await service.marquerRelance(contact.id, { note: "Rappeler après l'audit de juin" });
+
+      await service.marquerRelance(contact.id, { note });
+
+      await expect(repository.trouver(contact.id)).resolves.toMatchObject({
+        note: "Rappeler après l'audit de juin",
+      });
+    });
+
+    it("planifie la relance suivante : le contact revient dans la liste le 2 décembre", async () => {
+      const contact = await contactARelancerAujourdhui();
+
+      await service.marquerRelance(contact.id, { prochaineRelance: "2026-12-02" });
+
+      await expect(service.aRelancer()).resolves.toEqual([]);
+      maintenant = new Date("2026-12-01T09:00:00.000Z");
+      await expect(service.aRelancer()).resolves.toEqual([]);
+      maintenant = new Date("2026-12-02T09:00:00.000Z");
+      await expect(service.aRelancer()).resolves.toMatchObject([
+        { id: contact.id, relanceLe: "2026-12-02", retard: 0 },
+      ]);
+    });
+
+    it.each([undefined, "", "  "])(
+      "ne planifie aucune relance avec la relance suivante %j",
+      async (prochaineRelance) => {
+        const contact = await contactARelancerAujourdhui();
+
+        await service.marquerRelance(contact.id, { prochaineRelance });
+
+        await expect(repository.trouver(contact.id)).resolves.toMatchObject({ relanceLe: null });
+      },
+    );
+
+    it.each(["2026-11-18", "2026-11-10"])(
+      "refuse une relance suivante au %s, qui garderait le contact dans la liste",
+      async (prochaineRelance) => {
+        const contact = await contactARelancerAujourdhui();
+
+        await expect(service.marquerRelance(contact.id, { prochaineRelance })).resolves.toEqual({
+          ok: false,
+          erreur: "La relance suivante doit tomber après aujourd'hui.",
+        });
+        await expect(repository.trouver(contact.id)).resolves.toMatchObject({
+          dernierEchangeLe: null,
+          relanceLe: "2026-11-18",
+        });
+      },
+    );
+
+    it("refuse une relance suivante mal formée", async () => {
+      const contact = await contactARelancerAujourdhui();
+
+      await expect(
+        service.marquerRelance(contact.id, { prochaineRelance: "2 décembre" }),
+      ).resolves.toEqual({ ok: false, erreur: "Indiquez une date de relance." });
+    });
+
+    it("refuse un contact inconnu", async () => {
+      await expect(service.marquerRelance(42, {})).resolves.toEqual({
+        ok: false,
+        erreur: "Ce contact n'existe plus.",
+      });
+    });
+  });
+
+  describe("joursDepuisDernierEchange", () => {
+    it("compte les jours depuis le dernier échange", async () => {
+      const contact = await contactA("demo");
+      await repository.enregistrerEchange(contact.id, {
+        dernierEchangeLe: "2026-11-14",
+        note: null,
+        relanceLe: null,
+      });
+
+      await expect(service.lister()).resolves.toMatchObject([{ joursDepuisDernierEchange: 4 }]);
+    });
+
+    it("vaut null sans échange", async () => {
+      await contactA("demo");
+
+      await expect(service.lister()).resolves.toMatchObject([{ joursDepuisDernierEchange: null }]);
+    });
+  });
+
+  describe("modifier", () => {
+    const fiche = {
+      nom: "Claire Vasseur",
+      entreprise: "Vernier Industrie",
+      fonction: "Responsable PLM",
+      email: "claire.vasseur@vernier.fr",
+      telephone: "06 12 34 56 78",
+    };
+
+    it("enregistre la nouvelle entreprise, que la liste affiche", async () => {
+      const contact = await contactA("demo");
+
+      const resultat = await service.modifier(contact.id, { ...fiche, entreprise: "Vernier Industrie" });
+
+      expect(resultat).toEqual({
+        ok: true,
+        contact: expect.objectContaining({ id: contact.id, entreprise: "Vernier Industrie" }),
+      });
+      await expect(service.lister()).resolves.toMatchObject([
+        { nom: "Claire Vasseur", entreprise: "Vernier Industrie" },
+      ]);
+    });
+
+    it("enregistre fonction, e-mail et téléphone, sans toucher à l'étape ni à la relance", async () => {
+      const contact = await contactA("demo");
+      await repository.changerRelance(contact.id, "2026-11-24");
+
+      await service.modifier(contact.id, fiche);
+
+      await expect(repository.trouver(contact.id)).resolves.toMatchObject({
+        ...fiche,
+        etape: "demo",
+        relanceLe: "2026-11-24",
+      });
+    });
+
+    it("retire les espaces et enregistre les champs facultatifs vides comme absents", async () => {
+      const contact = await contactA("demo");
+
+      await service.modifier(contact.id, {
+        nom: "  Claire Vasseur ",
+        entreprise: "  ",
+        fonction: "",
+        email: " claire.vasseur@vernier.fr ",
+        telephone: undefined,
+      });
+
+      await expect(repository.trouver(contact.id)).resolves.toMatchObject({
+        nom: "Claire Vasseur",
+        entreprise: null,
+        fonction: null,
+        email: "claire.vasseur@vernier.fr",
+        telephone: null,
+      });
+    });
+
+    it.each(["", "   "])("refuse le nom %j sans rien modifier", async (nom) => {
+      const contact = await contactA("demo");
+
+      await expect(service.modifier(contact.id, { ...fiche, nom })).resolves.toEqual({
+        ok: false,
+        erreurs: { nom: "Indiquez le nom du contact." },
+      });
+      await expect(repository.trouver(contact.id)).resolves.toEqual(contact);
+    });
+
+    it.each(["claire", "claire@", "claire@vernier", "claire vasseur@vernier.fr", "@vernier.fr"])(
+      "refuse l'e-mail mal formé %j sans rien modifier",
+      async (email) => {
+        const contact = await contactA("demo");
+
+        await expect(service.modifier(contact.id, { ...fiche, email })).resolves.toEqual({
+          ok: false,
+          erreurs: { email: "Cette adresse e-mail n'est pas valide." },
+        });
+        await expect(repository.trouver(contact.id)).resolves.toEqual(contact);
+      },
+    );
+
+    it("signale ensemble un nom vide et un e-mail mal formé", async () => {
+      const contact = await contactA("demo");
+
+      await expect(
+        service.modifier(contact.id, { ...fiche, nom: "", email: "claire" }),
+      ).resolves.toEqual({
+        ok: false,
+        erreurs: {
+          nom: "Indiquez le nom du contact.",
+          email: "Cette adresse e-mail n'est pas valide.",
+        },
+      });
+    });
+
+    it("refuse un contact inconnu", async () => {
+      await expect(service.modifier(42, fiche)).resolves.toEqual({
+        ok: false,
+        erreurs: { contact: "Ce contact n'existe plus." },
+      });
+    });
+  });
+
+  describe("supprimer", () => {
+    it("retire le contact de la liste et de « À relancer aujourd'hui »", async () => {
+      const contact = await contactA("demo");
+      await repository.changerRelance(contact.id, "2026-11-18");
+      await expect(service.aRelancer()).resolves.toHaveLength(1);
+
+      await expect(service.supprimer(contact.id)).resolves.toEqual({ ok: true });
+
+      await expect(service.lister()).resolves.toEqual([]);
+      await expect(service.aRelancer()).resolves.toEqual([]);
+    });
+
+    it("refuse un contact inconnu", async () => {
+      await expect(service.supprimer(42)).resolves.toEqual({
         ok: false,
         erreur: "Ce contact n'existe plus.",
       });

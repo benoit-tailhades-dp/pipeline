@@ -20,6 +20,19 @@ export async function appliquerSchema(db: Db): Promise<void> {
     "etape",
     "ALTER TABLE contacts ADD COLUMN etape TEXT NOT NULL DEFAULT 'a-contacter'",
   );
+  // Lot 3 : date de relance au format AAAA-MM-JJ, absente par défaut.
+  await ajouterColonneAbsente(db, "relance_le", "ALTER TABLE contacts ADD COLUMN relance_le TEXT");
+  // Lot 5 : date (AAAA-MM-JJ) et note du dernier échange.
+  await ajouterColonneAbsente(
+    db,
+    "dernier_echange_le",
+    "ALTER TABLE contacts ADD COLUMN dernier_echange_le TEXT",
+  );
+  await ajouterColonneAbsente(db, "note", "ALTER TABLE contacts ADD COLUMN note TEXT");
+  // Lot 6 : coordonnées complétées depuis la fiche.
+  await ajouterColonneAbsente(db, "fonction", "ALTER TABLE contacts ADD COLUMN fonction TEXT");
+  await ajouterColonneAbsente(db, "email", "ALTER TABLE contacts ADD COLUMN email TEXT");
+  await ajouterColonneAbsente(db, "telephone", "ALTER TABLE contacts ADD COLUMN telephone TEXT");
 }
 
 async function ajouterColonneAbsente(db: Db, colonne: string, ajout: string): Promise<void> {

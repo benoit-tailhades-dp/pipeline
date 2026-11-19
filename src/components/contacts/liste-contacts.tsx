@@ -1,17 +1,15 @@
-import type { ContactSuivi, Etape, EtapeDuParcours } from "@/services/contact-service";
+import type { ContactSuivi, EtapeDuParcours } from "@/services/contact-service";
 
-import { CarteContact } from "./carte-contact";
+import { CarteContact, type ActionsContact } from "./carte-contact";
 
 export function ListeContacts({
   contacts,
   etapes,
-  avancerAction,
-  changerEtapeAction,
+  actions,
 }: {
   contacts: ContactSuivi[];
   etapes: readonly EtapeDuParcours[];
-  avancerAction: (id: number) => Promise<void>;
-  changerEtapeAction: (id: number, etape: Etape) => Promise<void>;
+  actions: ActionsContact;
 }) {
   if (contacts.length === 0) {
     return (
@@ -25,12 +23,7 @@ export function ListeContacts({
     <ul className="flex flex-col gap-3">
       {contacts.map((contact) => (
         <li key={contact.id}>
-          <CarteContact
-            contact={contact}
-            etapes={etapes}
-            avancerAction={avancerAction}
-            changerEtapeAction={changerEtapeAction}
-          />
+          <CarteContact contact={contact} etapes={etapes} actions={actions} />
         </li>
       ))}
     </ul>

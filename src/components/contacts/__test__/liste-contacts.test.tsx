@@ -1,40 +1,17 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import type { ContactSuivi, EtapeDuParcours } from "@/services/contact-service";
+import type { ContactSuivi } from "@/services/contact-service";
 
 import { ListeContacts } from "../liste-contacts";
-
-const etapes: EtapeDuParcours[] = [
-  { code: "a-contacter", temperature: "froid" },
-  { code: "premier-echange", temperature: "froid" },
-  { code: "demo", temperature: "tiede" },
-  { code: "proposition", temperature: "chaud" },
-  { code: "gagne", temperature: "signe" },
-];
+import { actionsInertes, contactSuivi, etapes } from "./fixtures";
 
 function contact(id: number, nom: string, entreprise: string | null = null): ContactSuivi {
-  return {
-    id,
-    nom,
-    entreprise,
-    creeLe: new Date("2026-11-18T09:00:00.000Z"),
-    etape: "a-contacter",
-    temperature: "froid",
-    position: 1,
-    suivante: "premier-echange",
-  };
+  return contactSuivi({ id, nom, entreprise });
 }
 
 function afficher(contacts: ContactSuivi[]) {
-  return render(
-    <ListeContacts
-      contacts={contacts}
-      etapes={etapes}
-      avancerAction={async () => {}}
-      changerEtapeAction={async () => {}}
-    />,
-  );
+  return render(<ListeContacts contacts={contacts} etapes={etapes} actions={actionsInertes} />);
 }
 
 describe("ListeContacts", () => {
