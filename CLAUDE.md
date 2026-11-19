@@ -29,6 +29,12 @@ Lot 5 livré : « Marquer comme relancé » dans « À relancer aujourd’hui »
 
 Lot 6 livré : depuis la carte, « Modifier » ouvre la fiche (`FicheContact` : nom, entreprise, fonction, e-mail, téléphone) et « Supprimer » demande une confirmation dans la carte, sans boîte de dialogue. Le service valide le nom et la forme de l'e-mail (`modifier`). Le formulaire est en `noValidate` pour que ce soit le message du service qui s'affiche.
 
+Lot 7 livré : l'accueil est un tableau de cinq colonnes (`TableauContacts`, service `tableau()`, qui trie les relances dues d'abord puis du plus récent au plus ancien). Le glisser-déposer passe par `@dnd-kit/core` (souris, appui long au doigt) ; au clavier, Maj + flèche sur le nom de la carte. La carte en main se lit dans `useDndContext()`, jamais dans un état à part : un geste plus rapide qu'un rendu se termine sans `onDragEnd`. Le déplacement s'affiche tout de suite (`useOptimistic`), le rafraîchissement rétablit l'ordre du service. Un clic sur la carte ouvre `FicheTiroir` (Sheet) : piste cliquable, relance, dernier échange, coordonnées, modification, suppression. `ContactSuivi.retardRelance` dit si la relance est en retard (> 0), du jour (0) ou à venir (< 0). « À relancer aujourd'hui » est sur `/aujourdhui` ; la barre (`BarreApp`, chargée par `src/app/barre.tsx`) affiche le nombre de relances dues. Jetons ajoutés : `colonne` et `bord-fort`.
+
+Lot 8 livré : le service propose les dates rapides (`datesRapides()` : demain, 3 jours, 1 semaine, 2 semaines, avec `ajouterJours`) et la progression du jour (`progressionDuJour()` : échanges enregistrés aujourd'hui sur relances du jour). `DatesRapides` sert à trois endroits : dans la fiche, un clic planifie ; dans `MarquerRelance`, il remplit la relance suivante ; sur « Aujourd'hui », derrière « Reporter » (`ReporterRelance`). La fiche permet de marquer comme relancé un contact dont la relance est due. `ProgressionDuJour` est une piste à un segment par relance (pas de largeur dynamique).
+
+Lot 9 livré : `FournisseurToasts` (dans le layout) affiche un message à la fois avec « Annuler » : après un déplacement (retour à l'étape d'avant), un marquage (`annulerMarquage` rétablit relance, note et dernier échange ; `Echange.dernierEchangeLe` accepte `null`) et une modification de la fiche. Une boîte modale rend le reste de la page inerte : la fiche contient `ZoneToasts`, où le message s'affiche tant qu'elle est ouverte. La recherche vit dans l'adresse (`/?q=`, `ChampRecherche`) et c'est `tableau(recherche)` qui filtre (nom, entreprise, fonction, note, sans accents ni majuscules). Raccourcis : N ouvre l'ajout, / la recherche, Échap ferme la fiche (Base UI).
+
 Le découpage en lots, avec les critères d'acceptation et le statut de chaque lot, est dans `LOTS.md`.
 
 ## Organisation des couches
@@ -43,7 +49,7 @@ Le découpage en lots, avec les critères d'acceptation et le statut de chaque l
 ## Tests
 
 - Vitest 5 avec deux projets (`vitest.config.mts`) : `node` pour tout `src/` hors présentation, `jsdom` pour `src/app/**` et `src/components/**`. Les fichiers de test (`*.test.ts(x)`) sont dans un dossier `__test__` placé à côté du code testé.
-- Données : tester contre `createDb(":memory:")`. Service : passer un faux repository qui implémente l'interface. Présentation : Testing Library, uniquement sur des composants synchrones (Vitest ne gère pas les Server Components async).
+- Données : tester contre `createDb(":memory:")`. Service : passer un faux repository qui implémente l'interface. Présentation : Testing Library, uniquement sur des composants synchrones (Vitest ne gère pas les Server Components async). Un composant qui appelle `useRouter` se teste avec `vi.mock("next/navigation")` (voir `champ-recherche.test.tsx`) ; un glisser-déposer, en posant la géométrie avec un faux `getBoundingClientRect` (voir `tableau-contacts.test.tsx`).
 - Les chemins `@/*` sont résolus nativement par Vite 8 (`resolve.tsconfigPaths`) : pas besoin de `vite-tsconfig-paths`.
 
 ## Particularités de la stack

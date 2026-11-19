@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { ContactSuivi } from "@/services/contact-service";
 
 import { RelanceContact, type EtatRelance } from "../relance-contact";
-import { contactSuivi } from "./fixtures";
+import { contactSuivi, datesRapides } from "./fixtures";
 
 function afficher(
   contact: ContactSuivi,
@@ -18,6 +18,7 @@ function afficher(
       contact={contact}
       planifierAction={actions.planifier ?? (async () => ({}))}
       retirerAction={actions.retirer ?? (async () => {})}
+      datesRapides={datesRapides}
     />,
   );
 }
@@ -27,6 +28,15 @@ function champDate() {
 }
 
 describe("RelanceContact", () => {
+  it("planifie la relance au 21 novembre quand je choisis « Dans 3 jours »", async () => {
+    const planifier = vi.fn(async () => ({}));
+    afficher(contactSuivi(), { planifier });
+
+    fireEvent.click(screen.getByRole("button", { name: /^Dans 3 jours/ }));
+
+    await waitFor(() => expect(planifier).toHaveBeenCalledExactlyOnceWith(7, "2026-11-21"));
+  });
+
   it("affiche « Relance le 24 nov. » pour une relance planifiée au 24 novembre", () => {
     afficher(contactSuivi({ relanceLe: "2026-11-24" }));
 

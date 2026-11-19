@@ -591,6 +591,309 @@ describe("ContactService", () => {
     });
   });
 
+  describe("datesRapides", () => {
+    it("propose demain, dans 3 jours, dans 1 semaine et dans 2 semaines, à partir d'aujourd'hui", () => {
+      // `maintenant` : le 18 novembre 2026 à 10 h, heure de Paris.
+      expect(service.datesRapides()).toEqual([
+        { code: "demain", date: "2026-11-19" },
+        { code: "3-jours", date: "2026-11-21" },
+        { code: "1-semaine", date: "2026-11-25" },
+        { code: "2-semaines", date: "2026-12-02" },
+      ]);
+    });
+
+    it("compte à partir d'aujourd'hui à l'heure de Paris", () => {
+      // 23 h 30 UTC le 18 : il est déjà 0 h 30 le 19 à Paris.
+      maintenant = new Date("2026-11-18T23:30:00.000Z");
+
+      expect(service.datesRapides()[0]).toEqual({ code: "demain", date: "2026-11-20" });
+    });
+  });
+
+  describe("progressionDuJour", () => {
+    // `maintenant` : le 18 novembre 2026 à 10 h, heure de Paris.
+    async function contact(relance: string | null, echange: string | null = null) {
+      const cree = await repository.ajouter({
+        nom: "Claire Vasseur",
+        entreprise: null,
+        etape: "demo",
+        creeLe: maintenant,
+      });
+      await repository.enregistrerEchange(cree.id, {
+        dernierEchangeLe: echange ?? "2026-11-01",
+        note: null,
+        relanceLe: relance,
+      });
+      return cree;
+    }
+
+    it("compte 1 sur 5 avec 4 relances dues et 1 échange enregistré aujourd'hui", async () => {
+      await contact("2026-11-18");
+      await contact("2026-11-18");
+      await contact("2026-11-15");
+      await contact("2026-11-17");
+      await contact("2026-11-25", "2026-11-18");
+
+      await expect(service.progressionDuJour()).resolves.toEqual({ faites: 1, total: 5 });
+    });
+
+    it("ne compte ni les relances à venir ni les contacts sans relance", async () => {
+      await contact("2026-11-19");
+      await contact(null);
+
+      await expect(service.progressionDuJour()).resolves.toEqual({ faites: 0, total: 0 });
+    });
+
+    it("fait passer un contact de « à faire » à « fait » quand je le marque comme relancé", async () => {
+      const claire = await contact("2026-11-18");
+      await contact("2026-11-16");
+
+      await service.marquerRelance(claire.id, { prochaineRelance: "2026-11-25" });
+
+      await expect(service.progressionDuJour()).resolves.toEqual({ faites: 1, total: 2 });
+    });
+  });
+
+  describe("annulerMarquage", () => {
+    // `maintenant` : le 18 novembre 2026 à 10 h, heure de Paris.
+    const avant = { dernierEchangeLe: "2026-11-04", note: "Ancienne note", relanceLe: "2026-11-15" };
+
+    async function contactMarque() {
+      const contact = await contactA("demo");
+      await repository.enregistrerEchange(contact.id, avant);
+      await service.marquerRelance(contact.id, { note: "Nouvelle note", prochaineRelance: "2026-11-25" });
+      return contact;
+    }
+
+    it("remet la relance, la note et le dernier échange d'avant le marquage", async () => {
+      const contact = await contactMarque();
+
+      const resultat = await service.annulerMarquage(contact.id, avant);
+
+      expect(resultat).toMatchObject({ ok: true, contact: { ...avant, retardRelance: 3 } });
+      await expect(repository.trouver(contact.id)).resolves.toMatchObject(avant);
+    });
+
+    it("remet un contact qui n'avait encore ni échange, ni note, ni relance", async () => {
+      const contact = await contactA("demo");
+      await service.marquerRelance(contact.id, { note: "Première note" });
+
+      await service.annulerMarquage(contact.id, { dernierEchangeLe: null, note: null, relanceLe: null });
+
+      await expect(repository.trouver(contact.id)).resolves.toMatchObject({
+        dernierEchangeLe: null,
+        note: null,
+        relanceLe: null,
+      });
+    });
+
+    it.each([
+      ["une date d'échange mal formée", { ...avant, dernierEchangeLe: "hier" }],
+      ["une relance qui n'est pas un texte", { ...avant, relanceLe: 15 }],
+      ["une note qui n'est pas un texte", { ...avant, note: 42 }],
+      ["une note de plus de 2 000 caractères", { ...avant, note: "x".repeat(2001) }],
+      ["un état absent", null],
+    ])("refuse %s sans rien modifier", async (_cas, precedent) => {
+      const contact = await contactMarque();
+      const marque = await repository.trouver(contact.id);
+
+      const resultat = await service.annulerMarquage(contact.id, precedent as never);
+
+      expect(resultat).toEqual({ ok: false, erreur: "Impossible d'annuler : l'état précédent n'est pas valide." });
+      await expect(repository.trouver(contact.id)).resolves.toEqual(marque);
+    });
+
+    it("signale un contact supprimé entre-temps", async () => {
+      await expect(service.annulerMarquage(42, avant)).resolves.toEqual({
+        ok: false,
+        erreur: "Ce contact n'existe plus.",
+      });
+    });
+  });
+
+  describe("tableau avec une recherche", () => {
+    beforeEach(async () => {
+      const claire = await contactA("demo");
+      await repository.enregistrerEchange(claire.id, {
+        dernierEchangeLe: "2026-11-04",
+        note: "Veut migrer ses nomenclatures avant l'audit de juin.",
+        relanceLe: null,
+      });
+      const elodie = await repository.ajouter({
+        nom: "Élodie Ferrand",
+        entreprise: "Textiles Ferrand",
+        etape: "premier-echange",
+        creeLe: maintenant,
+      });
+      await repository.modifier(elodie.id, {
+        nom: "Élodie Ferrand",
+        entreprise: "Textiles Ferrand",
+        fonction: "Directrice des opérations",
+        email: null,
+        telephone: null,
+      });
+      const marc = await repository.ajouter({
+        nom: "Marc Delorme",
+        entreprise: "Cartonnages Merlet",
+        etape: "a-contacter",
+        creeLe: maintenant,
+      });
+      await repository.enregistrerEchange(marc.id, {
+        dernierEchangeLe: "2026-11-10",
+        note: "Contact donné par Julien Marchetti.",
+        relanceLe: null,
+      });
+    });
+
+    async function nomsTrouves(recherche: string) {
+      const colonnes = await service.tableau(recherche);
+      return colonnes.flatMap((colonne) => colonne.contacts.map((contact) => contact.nom));
+    }
+
+    it("ne garde que les contacts dont le nom, l'entreprise, la fonction ou la note contient la recherche", async () => {
+      await expect(nomsTrouves("vernier")).resolves.toEqual(["Claire Vasseur"]);
+      await expect(nomsTrouves("nomenclatures")).resolves.toEqual(["Claire Vasseur"]);
+      await expect(nomsTrouves("directrice")).resolves.toEqual(["Élodie Ferrand"]);
+      await expect(nomsTrouves("delorme")).resolves.toEqual(["Marc Delorme"]);
+    });
+
+    it("ne tient compte ni des accents ni des majuscules", async () => {
+      await expect(nomsTrouves("ELODIE")).resolves.toEqual(["Élodie Ferrand"]);
+      await expect(nomsTrouves("operations")).resolves.toEqual(["Élodie Ferrand"]);
+      await expect(nomsTrouves("  Marchetti ")).resolves.toEqual(["Marc Delorme"]);
+    });
+
+    it("garde les cinq colonnes, même vides", async () => {
+      const colonnes = await service.tableau("vernier");
+
+      expect(colonnes.map((c) => [c.code, c.contacts.length])).toEqual([
+        ["a-contacter", 0],
+        ["premier-echange", 0],
+        ["demo", 1],
+        ["proposition", 0],
+        ["gagne", 0],
+      ]);
+    });
+
+    it.each(["", "   ", undefined, 42])("renvoie tous les contacts pour la recherche %j", async (recherche) => {
+      const colonnes = await service.tableau(recherche as string | undefined);
+
+      expect(colonnes.flatMap((c) => c.contacts)).toHaveLength(3);
+    });
+  });
+
+  describe("retardRelance", () => {
+    // `maintenant` : le 18 novembre 2026 à 10 h, heure de Paris.
+    it.each([
+      ["2026-11-15", 3],
+      ["2026-11-18", 0],
+      ["2026-11-19", -1],
+      ["2026-11-24", -6],
+    ])("vaut %s → %i : positif en retard, 0 aujourd'hui, négatif à venir", async (date, attendu) => {
+      const contact = await contactA("demo");
+      await repository.changerRelance(contact.id, date);
+
+      await expect(service.lister()).resolves.toMatchObject([{ retardRelance: attendu }]);
+    });
+
+    it("vaut null sans relance", async () => {
+      await contactA("demo");
+
+      await expect(service.lister()).resolves.toMatchObject([{ retardRelance: null }]);
+    });
+  });
+
+  describe("tableau", () => {
+    // `maintenant` : le 18 novembre 2026 à 10 h, heure de Paris.
+
+    /** Ajoute un contact créé à l'heure `heure` du 18 novembre, avec ou sans relance. */
+    async function contact(nom: string, etape: Etape, heure: number, relance: string | null = null) {
+      const cree = await repository.ajouter({
+        nom,
+        entreprise: null,
+        etape,
+        creeLe: new Date(`2026-11-18T${String(heure).padStart(2, "0")}:00:00.000Z`),
+      });
+      if (relance) await repository.changerRelance(cree.id, relance);
+    }
+
+    it("renvoie les cinq étapes dans l'ordre, avec leur température, même vides", async () => {
+      const colonnes = await service.tableau();
+
+      expect(colonnes).toEqual([
+        { code: "a-contacter", temperature: "froid", contacts: [] },
+        { code: "premier-echange", temperature: "froid", contacts: [] },
+        { code: "demo", temperature: "tiede", contacts: [] },
+        { code: "proposition", temperature: "chaud", contacts: [] },
+        { code: "gagne", temperature: "signe", contacts: [] },
+      ]);
+    });
+
+    it("range chaque contact dans la colonne de son étape", async () => {
+      await contact("Claire Vasseur", "demo", 8);
+      await contact("Marc Delorme", "a-contacter", 8);
+      await contact("Inès Garnier", "demo", 9);
+      await contact("Paul Roche", "gagne", 8);
+
+      const colonnes = await service.tableau();
+
+      expect(colonnes.map((c) => [c.code, c.contacts.map((x) => x.nom)])).toEqual([
+        ["a-contacter", ["Marc Delorme"]],
+        ["premier-echange", []],
+        ["demo", ["Inès Garnier", "Claire Vasseur"]],
+        ["proposition", []],
+        ["gagne", ["Paul Roche"]],
+      ]);
+    });
+
+    it("décrit chaque contact comme la carte l'affiche", async () => {
+      await contact("Claire Vasseur", "demo", 8, "2026-11-15");
+
+      const [, , demo] = await service.tableau();
+
+      expect(demo.contacts).toEqual([
+        expect.objectContaining({
+          nom: "Claire Vasseur",
+          temperature: "tiede",
+          position: 3,
+          suivante: "proposition",
+          retardRelance: 3,
+        }),
+      ]);
+    });
+
+    it("place les relances dues d'abord, la plus en retard en tête, puis les autres du plus récent au plus ancien", async () => {
+      await contact("Ancien sans relance", "demo", 6);
+      await contact("Prévue demain", "demo", 7, "2026-11-19");
+      await contact("Du jour", "demo", 8, "2026-11-18");
+      await contact("En retard de 3 jours", "demo", 5, "2026-11-15");
+      await contact("Récent sans relance", "demo", 9);
+      await contact("En retard de 1 jour", "demo", 10, "2026-11-17");
+
+      const [, , demo] = await service.tableau();
+
+      expect(demo.contacts.map((c) => c.nom)).toEqual([
+        "En retard de 3 jours",
+        "En retard de 1 jour",
+        "Du jour",
+        "Récent sans relance",
+        "Prévue demain",
+        "Ancien sans relance",
+      ]);
+    });
+
+    it("place le dernier contact ajouté en tête de « À contacter » quand aucune relance n'est due", async () => {
+      maintenant = new Date("2026-11-18T09:00:00.000Z");
+      await service.ajouter({ nom: "Claire Vasseur" });
+      maintenant = new Date("2026-11-18T10:00:00.000Z");
+      await service.ajouter({ nom: "Marc Delorme" });
+
+      const [aContacter] = await service.tableau();
+
+      expect(aContacter.contacts.map((c) => c.nom)).toEqual(["Marc Delorme", "Claire Vasseur"]);
+    });
+  });
+
   describe("modifier", () => {
     const fiche = {
       nom: "Claire Vasseur",

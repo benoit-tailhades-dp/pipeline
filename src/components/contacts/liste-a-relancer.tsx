@@ -7,9 +7,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import type { ContactARelancer } from "@/services/contact-service";
+import type { ContactARelancer, DateRapide, EtatEchange } from "@/services/contact-service";
 
 import { MarquerRelance, type EtatMarquage, type SaisieMarquage } from "./marquer-relance";
+import type { EtatRelance } from "./relance-contact";
+import { ReporterRelance } from "./reporter-relance";
 
 function retardEnClair(retard: number): string {
   return retard === 1 ? "En retard de 1 jour" : `En retard de ${retard} jours`;
@@ -18,9 +20,17 @@ function retardEnClair(retard: number): string {
 export function ListeARelancer({
   contacts,
   marquerAction,
+  planifierAction,
+  datesRapides = [],
+  annulerAction,
 }: {
   contacts: ContactARelancer[];
   marquerAction: (id: number, saisie: SaisieMarquage) => Promise<EtatMarquage>;
+  /** Pour « Reporter » : planifie la relance à une date rapide. */
+  planifierAction?: (id: number, date: string) => Promise<EtatRelance>;
+  datesRapides?: readonly DateRapide[];
+  /** Pour « Annuler » après un marquage : rétablit l'état d'avant. */
+  annulerAction?: (id: number, precedent: EtatEchange) => Promise<void>;
 }) {
   if (contacts.length === 0) {
     return <p className="text-sm text-muted-foreground">Personne à relancer aujourd’hui.</p>;
@@ -48,8 +58,25 @@ export function ListeARelancer({
                 )}
               </CardAction>
             </CardHeader>
-            <CardContent>
-              <MarquerRelance id={contact.id} marquerAction={marquerAction} />
+            <CardContent className="grid gap-3">
+              <MarquerRelance
+                id={contact.id}
+                marquerAction={marquerAction}
+                datesRapides={datesRapides}
+                precedent={{
+                  dernierEchangeLe: contact.dernierEchangeLe,
+                  note: contact.note,
+                  relanceLe: contact.relanceLe,
+                }}
+                annulerAction={annulerAction}
+              />
+              {planifierAction && datesRapides.length > 0 && (
+                <ReporterRelance
+                  id={contact.id}
+                  datesRapides={datesRapides}
+                  planifierAction={planifierAction}
+                />
+              )}
             </CardContent>
           </Card>
         </li>

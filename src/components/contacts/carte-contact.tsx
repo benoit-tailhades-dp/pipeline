@@ -1,291 +1,154 @@
 "use client";
 
-import { useId, useState, useTransition } from "react";
+import {
+  CalendarIcon,
+  CheckIcon,
+  ChevronRightIcon,
+  ClockIcon,
+  MessageSquareIcon,
+} from "lucide-react";
+import type { ComponentProps, KeyboardEvent } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import type {
-  ContactSuivi,
-  Etape,
-  EtapeDuParcours,
-  Temperature,
-} from "@/services/contact-service";
+import type { ContactSuivi } from "@/services/contact-service";
 
 import { formaterDateCourte } from "./dates";
-import { FicheContact, type EtatFiche, type ValeursFiche } from "./fiche-contact";
-import { RelanceContact, type EtatRelance } from "./relance-contact";
+import { Avatar, LIBELLES_ETAPES } from "./temperature";
 
-const LIBELLES_ETAPES: Record<Etape, string> = {
-  "a-contacter": "À contacter",
-  "premier-echange": "Premier échange",
-  demo: "Démo planifiée",
-  proposition: "Proposition envoyée",
-  gagne: "Gagné",
-};
-
-// Classes écrites en entier pour que Tailwind les détecte.
-const PASTILLES: Record<
-  Temperature,
-  { libelle: string; variante: "froid" | "tiede" | "chaud" | "default"; point: string | null }
-> = {
-  froid: { libelle: "Froid", variante: "froid", point: "bg-froid" },
-  tiede: { libelle: "Tiède", variante: "tiede", point: "bg-tiede" },
-  chaud: { libelle: "Chaud", variante: "chaud", point: "bg-chaud" },
-  signe: { libelle: "Signé", variante: "default", point: null },
-};
-
-const COULEURS_PISTE: Record<Temperature, string> = {
-  froid: "bg-froid",
-  tiede: "bg-tiede",
-  chaud: "bg-chaud",
-  signe: "bg-primary",
-};
-
-function dernierEchangeEnClair(jours: number, date: string): string {
-  if (jours === 0) return "aujourd’hui";
-  if (jours === 1) return "hier";
-  return `le ${formaterDateCourte(date)}`;
-}
-
-function Pastille({ temperature }: { temperature: Temperature }) {
-  const { libelle, variante, point } = PASTILLES[temperature];
+/** L'état de la relance tel que le service le décrit, traduit en pastille. */
+function PuceRelance({ contact }: { contact: ContactSuivi }) {
+  const retard = contact.retardRelance;
+  if (retard === null || contact.relanceLe === null) {
+    return contact.etape === "gagne" ? (
+      <Badge variant="secondary">
+        <CheckIcon aria-hidden />
+        Signé
+      </Badge>
+    ) : (
+      <Badge variant="outline" className="border-dashed border-bord-fort text-muted-foreground">
+        Sans relance
+      </Badge>
+    );
+  }
+  if (retard > 0) {
+    return (
+      <Badge variant="destructive">
+        <ClockIcon aria-hidden />
+        En retard de {retard} j
+      </Badge>
+    );
+  }
+  if (retard === 0) {
+    return (
+      <Badge>
+        <ClockIcon aria-hidden />
+        Aujourd’hui
+      </Badge>
+    );
+  }
   return (
-    <Badge variant={variante} size="lg">
-      {point && <span aria-hidden className={cn("size-2 rounded-full", point)} />}
-      {libelle}
+    <Badge variant="outline" className="text-muted-foreground">
+      <CalendarIcon aria-hidden />
+      {retard === -1 ? (
+        "Demain"
+      ) : (
+        <>
+          <span className="sr-only">Relance le </span>
+          {formaterDateCourte(contact.relanceLe)}
+        </>
+      )}
     </Badge>
   );
 }
 
-function Piste({
-  etapes,
-  position,
-}: {
-  etapes: readonly EtapeDuParcours[];
-  position: number;
-}) {
+function DernierEchange({ jours }: { jours: number | null }) {
+  if (jours === null) return null;
+  const quand = jours === 0 ? "aujourd’hui" : jours === 1 ? "hier" : `il y a ${jours} j`;
   return (
-    <div
-      role="img"
-      aria-label={`Étape ${position} sur ${etapes.length}`}
-      className="grid grid-cols-5 gap-1"
+    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground tabular-nums">
+      <MessageSquareIcon aria-hidden className="size-3.5" />
+      <span className="sr-only">Dernier échange : </span>
+      {quand}
+    </span>
+  );
+}
+
+/**
+ * Carte compacte d'un contact sur le tableau. Le nom est le point d'entrée au clavier :
+ * il ouvre la fiche, et Maj + flèche change d'étape.
+ */
+export function CarteContact({
+  contact,
+  onOuvrir,
+  onAvancer,
+  onDeplacer,
+  className,
+  ...props
+}: {
+  contact: ContactSuivi;
+  onOuvrir: () => void;
+  onAvancer: () => void;
+  onDeplacer: (sens: 1 | -1) => void;
+} & Omit<ComponentProps<"article">, "onClick" | "children">) {
+  const sousTitre = contact.entreprise ?? contact.fonction;
+
+  function auClavier(event: KeyboardEvent) {
+    if (!event.shiftKey || (event.key !== "ArrowRight" && event.key !== "ArrowLeft")) return;
+    event.preventDefault();
+    onDeplacer(event.key === "ArrowRight" ? 1 : -1);
+  }
+
+  return (
+    <article
+      className={cn(
+        "group/carte grid shrink-0 cursor-grab touch-manipulation gap-2 rounded-xl border bg-card p-3 shadow-xs transition select-none hover:border-bord-fort hover:shadow-md",
+        className,
+      )}
+      onClick={onOuvrir}
+      {...props}
     >
-      {etapes.map((etape, i) => {
-        const franchie = i < position;
-        return (
-          <span
-            key={etape.code}
-            data-franchie={franchie}
-            className={cn(
-              "h-2 rounded-full",
-              franchie ? COULEURS_PISTE[etape.temperature] : "bg-muted",
-            )}
-          />
-        );
-      })}
-    </div>
-  );
-}
-
-/** Server Actions de la carte, reçues en props pour que le composant reste testable. */
-export interface ActionsContact {
-  avancer: (id: number) => Promise<void>;
-  changerEtape: (id: number, etape: Etape) => Promise<void>;
-  planifierRelance: (id: number, date: string) => Promise<EtatRelance>;
-  retirerRelance: (id: number) => Promise<void>;
-  modifier: (id: number, valeurs: ValeursFiche) => Promise<EtatFiche>;
-  supprimer: (id: number) => Promise<void>;
-}
-
-function Coordonnees({ contact }: { contact: ContactSuivi }) {
-  const lignes = [contact.email, contact.telephone].filter((ligne) => ligne !== null);
-  if (lignes.length === 0) return null;
-  return (
-    <ul className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground">
-      {lignes.map((ligne) => (
-        <li key={ligne}>{ligne}</li>
-      ))}
-    </ul>
-  );
-}
-
-function ConfirmationSuppression({
-  contact,
-  supprimerAction,
-  onAnnule,
-}: {
-  contact: ContactSuivi;
-  supprimerAction: (id: number) => Promise<void>;
-  onAnnule: () => void;
-}) {
-  const [enCours, demarrer] = useTransition();
-  return (
-    <div className="grid gap-3 rounded-lg bg-destructive/10 p-3 pl-4">
-      <p className="font-semibold">
-        Supprimer {contact.nom} ? Cette action est définitive.
-      </p>
-      <div className="flex flex-wrap gap-2">
-        <Button variant="outline" disabled={enCours} onClick={onAnnule}>
-          Annuler
-        </Button>
-        <Button
-          variant="destructive"
-          disabled={enCours}
-          onClick={() => demarrer(() => supprimerAction(contact.id))}
-        >
-          Confirmer la suppression
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function Suivi({
-  contact,
-  etapes,
-  actions,
-}: {
-  contact: ContactSuivi;
-  etapes: readonly EtapeDuParcours[];
-  actions: ActionsContact;
-}) {
-  const [enCours, demarrer] = useTransition();
-  const idEtape = useId();
-  const choix = etapes.map((etape) => ({
-    value: etape.code,
-    label: LIBELLES_ETAPES[etape.code],
-  }));
-
-  return (
-    <>
-      <div className="grid gap-2">
-        <Piste etapes={etapes} position={contact.position} />
-        <p className="text-muted-foreground">
-          Étape {contact.position} sur {etapes.length}
-        </p>
-      </div>
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="grid min-w-56 flex-1 gap-2">
-          <Label htmlFor={idEtape}>Étape</Label>
-          <Select
-            items={choix}
-            value={contact.etape}
-            disabled={enCours}
-            onValueChange={(etape) => {
-              if (etape && etape !== contact.etape) {
-                demarrer(() => actions.changerEtape(contact.id, etape));
-              }
-            }}
-          >
-            <SelectTrigger id={idEtape} className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {choix.map((c) => (
-                <SelectItem key={c.value} value={c.value}>
-                  {c.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <div className="flex items-center gap-2.5">
+        <Avatar nom={contact.nom} temperature={contact.temperature} />
+        <div className="min-w-0 flex-1">
+          <h3 className="flex text-sm font-bold">
+            <Button
+              variant="ghost"
+              className="h-auto max-w-full min-w-0 justify-start rounded-sm p-0 text-sm font-bold hover:bg-transparent"
+              aria-keyshortcuts="Shift+ArrowRight Shift+ArrowLeft"
+              onClick={(event) => {
+                event.stopPropagation();
+                onOuvrir();
+              }}
+              onKeyDown={auClavier}
+            >
+              <span className="truncate">{contact.nom}</span>
+            </Button>
+          </h3>
+          {sousTitre && <p className="truncate text-sm text-muted-foreground">{sousTitre}</p>}
         </div>
         {contact.suivante && (
           <Button
-            size="lg"
-            disabled={enCours}
-            onClick={() => demarrer(() => actions.avancer(contact.id))}
+            variant="ghost"
+            size="icon-sm"
+            aria-label={`Passer à « ${LIBELLES_ETAPES[contact.suivante]} »`}
+            title={`Passer à « ${LIBELLES_ETAPES[contact.suivante]} »`}
+            className="text-muted-foreground opacity-0 group-hover/carte:opacity-100 focus-visible:opacity-100 pointer-coarse:opacity-100"
+            onClick={(event) => {
+              event.stopPropagation();
+              onAvancer();
+            }}
           >
-            Étape suivante
+            <ChevronRightIcon />
           </Button>
         )}
       </div>
-      {contact.note && <p className="text-base">{contact.note}</p>}
-      {contact.dernierEchangeLe !== null && contact.joursDepuisDernierEchange !== null && (
-        <p className="text-muted-foreground">
-          Dernier échange :{" "}
-          {dernierEchangeEnClair(contact.joursDepuisDernierEchange, contact.dernierEchangeLe)}
-        </p>
-      )}
-      <RelanceContact
-        contact={contact}
-        planifierAction={actions.planifierRelance}
-        retirerAction={actions.retirerRelance}
-      />
-    </>
-  );
-}
-
-export function CarteContact({
-  contact,
-  etapes,
-  actions,
-}: {
-  contact: ContactSuivi;
-  etapes: readonly EtapeDuParcours[];
-  actions: ActionsContact;
-}) {
-  const [mode, setMode] = useState<"suivi" | "fiche" | "suppression">("suivi");
-  const description = [contact.fonction, contact.entreprise].filter(Boolean).join(", ");
-
-  return (
-    <Card size="sm">
-      <CardHeader>
-        <CardTitle role="heading" aria-level={3} className="text-lg font-bold tracking-tight">
-          {contact.nom}
-        </CardTitle>
-        {description && <CardDescription>{description}</CardDescription>}
-        <CardAction className="self-center">
-          <Pastille temperature={contact.temperature} />
-        </CardAction>
-      </CardHeader>
-      <CardContent className="grid gap-4">
-        {mode === "fiche" ? (
-          <FicheContact
-            contact={contact}
-            modifierAction={actions.modifier}
-            onEnregistre={() => setMode("suivi")}
-            onAnnule={() => setMode("suivi")}
-          />
-        ) : (
-          <>
-            <Coordonnees contact={contact} />
-            <Suivi contact={contact} etapes={etapes} actions={actions} />
-            {mode === "suppression" ? (
-              <ConfirmationSuppression
-                contact={contact}
-                supprimerAction={actions.supprimer}
-                onAnnule={() => setMode("suivi")}
-              />
-            ) : (
-              <div className="flex flex-wrap justify-end gap-2">
-                <Button variant="ghost" size="sm" onClick={() => setMode("fiche")}>
-                  Modifier
-                </Button>
-                <Button variant="destructive" size="sm" onClick={() => setMode("suppression")}>
-                  Supprimer
-                </Button>
-              </div>
-            )}
-          </>
-        )}
-      </CardContent>
-    </Card>
+      {contact.note && <p className="line-clamp-2 text-sm text-muted-foreground">{contact.note}</p>}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <PuceRelance contact={contact} />
+        <DernierEchange jours={contact.joursDepuisDernierEchange} />
+      </div>
+    </article>
   );
 }

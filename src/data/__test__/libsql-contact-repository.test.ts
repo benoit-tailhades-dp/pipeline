@@ -189,6 +189,27 @@ describe("LibsqlContactRepository", () => {
       });
     });
 
+    it("efface le dernier échange avec null, pour revenir à l'état d'avant un marquage", async () => {
+      const ajoute = await repository.ajouter(claire);
+      await repository.enregistrerEchange(ajoute.id, {
+        dernierEchangeLe: "2026-11-18",
+        note: "Note",
+        relanceLe: "2026-12-02",
+      });
+
+      await repository.enregistrerEchange(ajoute.id, {
+        dernierEchangeLe: null,
+        note: null,
+        relanceLe: "2026-11-15",
+      });
+
+      await expect(repository.trouver(ajoute.id)).resolves.toMatchObject({
+        dernierEchangeLe: null,
+        note: null,
+        relanceLe: "2026-11-15",
+      });
+    });
+
     it("ne touche pas aux autres contacts", async () => {
       const marc = await repository.ajouter({ ...claire, nom: "Marc Delorme" });
       const ajoute = await repository.ajouter(claire);

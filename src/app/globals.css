@@ -48,6 +48,9 @@
   --color-froid: var(--froid);
   --color-tiede: var(--tiede);
   --color-chaud: var(--chaud);
+  /* Tableau : fond des colonnes, bord appuyé (survol, cibles de dépôt). */
+  --color-colonne: var(--colonne);
+  --color-bord-fort: var(--bord-fort);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -81,6 +84,8 @@
   --froid: oklch(0.54 0.102 250.6); /* #3D72A8 */
   --tiede: oklch(0.744 0.147 83); /* #D9A21B */
   --chaud: oklch(0.558 0.179 28.7); /* #C73B30 */
+  --colonne: oklch(0.947 0.007 165);
+  --bord-fort: oklch(0.84 0.014 168);
   --chart-1: var(--froid);
   --chart-2: var(--tiede);
   --chart-3: var(--chaud);
@@ -119,6 +124,8 @@
   --froid: oklch(0.701 0.1 251.1); /* #6FA3DB */
   --tiede: oklch(0.787 0.142 85.9); /* #E2B23A */
   --chaud: oklch(0.699 0.153 27.4); /* #EE7468 */
+  --colonne: oklch(0.205 0.018 174.5);
+  --bord-fort: oklch(0.43 0.03 171);
   --sidebar: oklch(0.272 0.026 174.9);
   --sidebar-foreground: oklch(0.94 0.013 172.4);
   --sidebar-primary: oklch(0.742 0.111 166.5);

@@ -26,7 +26,8 @@ export interface Contact {
 
 /** Ce qu'on enregistre quand on marque un contact comme relancé. */
 export interface Echange {
-  dernierEchangeLe: DateCalendrier;
+  /** `null` pour revenir à « aucun échange », quand on annule un marquage. */
+  dernierEchangeLe: DateCalendrier | null;
   note: string | null;
   relanceLe: DateCalendrier | null;
 }

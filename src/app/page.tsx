@@ -3,7 +3,7 @@ import { Suspense } from "react";
 
 import {
   ajouterContact,
-  avancerEtape,
+  annulerMarquage,
   changerEtape,
   marquerRelance,
   modifierContact,
@@ -11,62 +11,52 @@ import {
   retirerRelance,
   supprimerContact,
 } from "@/app/actions";
-import type { ActionsContact } from "@/components/contacts/carte-contact";
-import { FormulaireContact } from "@/components/contacts/formulaire-contact";
-import { ListeARelancer } from "@/components/contacts/liste-a-relancer";
-import { ListeContacts } from "@/components/contacts/liste-contacts";
+import { Barre } from "@/app/barre";
+import type { ActionsContact } from "@/components/contacts/actions-contact";
+import { ChampRecherche } from "@/components/contacts/champ-recherche";
+import { TableauContacts } from "@/components/contacts/tableau-contacts";
 import { contactService } from "@/server/container";
 
 const actionsContact: ActionsContact = {
-  avancer: avancerEtape,
   changerEtape,
+  marquer: marquerRelance,
+  annulerMarquage,
   planifierRelance,
   retirerRelance,
   modifier: modifierContact,
   supprimer: supprimerContact,
 };
 
-async function RelancesDuJour() {
+async function TableauCourant({ parametres }: { parametres: PageProps<"/">["searchParams"] }) {
+  // libSQL en mode fichier est synchrone : sans connection(), Next figerait le tableau au build.
   await connection();
-  const relances = await (await contactService()).aRelancer();
-  return <ListeARelancer contacts={relances} marquerAction={marquerRelance} />;
-}
-
-async function ContactsCourants() {
-  // libSQL en mode fichier est synchrone : sans connection(), Next figerait la liste au build.
-  await connection();
+  const { q } = await parametres;
+  const filtre = typeof q === "string" ? q.trim() : "";
   const service = await contactService();
-  const contacts = await service.lister();
+  const colonnes = await service.tableau(filtre);
   return (
-    <ListeContacts contacts={contacts} etapes={service.etapes()} actions={actionsContact} />
+    <TableauContacts
+      colonnes={colonnes}
+      actions={actionsContact}
+      ajouterAction={ajouterContact}
+      datesRapides={service.datesRapides()}
+      recherche={<ChampRecherche valeur={filtre} />}
+      filtre={filtre}
+    />
   );
 }
 
-export default function Home() {
+export default function Accueil({ searchParams }: PageProps<"/">) {
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-6 py-16">
-      <h1 className="font-heading text-2xl font-bold tracking-tight">Pipeline</h1>
-      <section aria-labelledby="titre-relances" className="flex flex-col gap-4">
-        <h2 id="titre-relances" className="font-heading text-lg font-bold tracking-tight">
-          À relancer aujourd’hui
-        </h2>
+    <div className="flex h-dvh flex-col">
+      <Barre actif="tableau" />
+      <main className="flex min-h-0 flex-1 flex-col">
         <Suspense
-          fallback={<p className="text-sm text-muted-foreground">Chargement des relances…</p>}
+          fallback={<p className="px-6 py-5 text-sm text-muted-foreground">Chargement du tableau…</p>}
         >
-          <RelancesDuJour />
+          <TableauCourant parametres={searchParams} />
         </Suspense>
-      </section>
-      <FormulaireContact action={ajouterContact} />
-      <section aria-labelledby="titre-contacts" className="flex flex-col gap-4">
-        <h2 id="titre-contacts" className="font-heading text-lg font-bold tracking-tight">
-          Contacts
-        </h2>
-        <Suspense
-          fallback={<p className="text-sm text-muted-foreground">Chargement des contacts…</p>}
-        >
-          <ContactsCourants />
-        </Suspense>
-      </section>
-    </main>
+      </main>
+    </div>
   );
 }

@@ -1,13 +1,14 @@
 "use client";
 
-import { useActionState, useId, useTransition } from "react";
+import { useActionState, useId, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { ContactSuivi } from "@/services/contact-service";
+import type { ContactSuivi, DateRapide } from "@/services/contact-service";
 
 import { formaterDateCourte } from "./dates";
+import { DatesRapides } from "./dates-rapides";
 
 export interface EtatRelance {
   erreur?: string;
@@ -19,10 +20,13 @@ export function RelanceContact({
   contact,
   planifierAction,
   retirerAction,
+  datesRapides = [],
 }: {
   contact: Pick<ContactSuivi, "id" | "relanceLe">;
   planifierAction: (id: number, date: string) => Promise<EtatRelance>;
   retirerAction: (id: number) => Promise<void>;
+  /** Dates proposées par le service : un clic planifie la relance. */
+  datesRapides?: readonly DateRapide[];
 }) {
   const [etat, envoyer, envoiEnCours] = useActionState(
     (_etat: EtatRelance, formData: FormData) => {
@@ -32,6 +36,7 @@ export function RelanceContact({
     {},
   );
   const [retraitEnCours, demarrer] = useTransition();
+  const [erreurRapide, setErreurRapide] = useState<string>();
   const id = useId();
   const idDate = `${id}-date`;
   const idErreur = `${id}-erreur`;
@@ -53,6 +58,21 @@ export function RelanceContact({
         </div>
       ) : (
         <p className="text-muted-foreground">Aucune relance planifiée</p>
+      )}
+      {datesRapides.length > 0 && (
+        <div className="grid gap-2">
+          <DatesRapides
+            dates={datesRapides}
+            desactive={enCours}
+            onChoisir={(date) =>
+              demarrer(async () => {
+                const resultat = await planifierAction(contact.id, date);
+                setErreurRapide(resultat.erreur);
+              })
+            }
+          />
+          {erreurRapide && <p className="text-sm text-destructive">{erreurRapide}</p>}
+        </div>
       )}
       {/* Pas de `min` : le service refuse une date passée et fournit le message. */}
       <form action={envoyer} className="flex flex-wrap items-end gap-3">

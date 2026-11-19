@@ -3,14 +3,6 @@ import { PlusIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -22,6 +14,14 @@ import {
 } from "@/components/ui/select";
 import { ThemeSwitch } from "@/components/theme-switch";
 import { cn } from "@/lib/utils";
+
+import {
+  ExempleToast,
+  ExempleTiroir,
+  ExemplesCartes,
+  ExemplesGlisser,
+  ExemplesRelance,
+} from "./exemples-tableau";
 
 export const metadata: Metadata = {
   title: "Design system",
@@ -42,6 +42,8 @@ const couleurs = [
   { nom: "Bordure", token: "border", className: "bg-border" },
   { nom: "Bordure de champ", token: "input", className: "bg-input" },
   { nom: "Focus", token: "ring", className: "bg-ring" },
+  { nom: "Colonne", token: "colonne", className: "bg-colonne" },
+  { nom: "Bord appuyé", token: "bord-fort", className: "bg-bord-fort" },
 ];
 
 const temperatures = [
@@ -281,50 +283,39 @@ export default function DesignSystem() {
         </div>
       </Section>
 
-      <Section titre="Carte de contact" description="Composition de Card, Badge, Button et de la piste d’étapes.">
-        <Card className="max-w-md">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <span
-                aria-hidden
-                className="grid size-11 shrink-0 place-items-center rounded-full bg-tiede/15 font-bold"
-              >
-                CV
-              </span>
-              <div>
-                <CardTitle className="text-lg font-bold">Claire Vasseur</CardTitle>
-                <CardDescription>Responsable PLM, Ateliers Vernier</CardDescription>
-              </div>
-            </div>
-            <CardAction className="self-center">
-              <Badge variant="tiede" size="lg">
-                <span className="size-2 rounded-full bg-tiede" />
-                Tiède
-              </Badge>
-            </CardAction>
-          </CardHeader>
-          <CardContent className="grid gap-4">
-            <div className="grid gap-2">
-              <Piste etape={3} />
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-muted-foreground">
-                  <span className="font-semibold text-foreground">Démo planifiée</span>, étape 3 sur 5
-                </p>
-                <Button variant="ghost" size="sm">
-                  Changer d’étape
-                </Button>
-              </div>
-            </div>
-            <p className="text-base">Veut migrer ses nomenclatures avant l’audit de juin.</p>
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-secondary p-3 pl-4">
-              <div>
-                <p className="text-base font-bold">À relancer aujourd’hui</p>
-                <p className="text-muted-foreground">Dernier échange le 4 nov.</p>
-              </div>
-              <Button>Marquer comme relancé</Button>
-            </div>
-          </CardContent>
-        </Card>
+      <Section
+        titre="Carte de contact"
+        description="Compacte : qui, quelle entreprise, quand relancer. Le reste est dans la fiche. L’état de la relance se lit à la forme et à la couleur de la pastille."
+      >
+        <ExemplesCartes />
+      </Section>
+
+      <Section
+        titre="Tableau et glisser-déposer"
+        description="Une colonne par étape, sur fond colonne. Au clavier, Maj + flèche droite ou gauche sur le nom change l’étape."
+      >
+        <ExemplesGlisser />
+      </Section>
+
+      <Section
+        titre="Relancer"
+        description="Dates rapides et progression du jour, dans la fiche et sur la page « Aujourd’hui »."
+      >
+        <ExemplesRelance />
+      </Section>
+
+      <Section
+        titre="Toast"
+        description="Un message à la fois, en bas de l’écran, en couleurs inversées. « Annuler » défait l’action ; le message disparaît seul après 6 secondes. Dans une boîte modale, il s’affiche dans la boîte (ZoneToasts) pour rester cliquable."
+      >
+        <ExempleToast />
+      </Section>
+
+      <Section
+        titre="Tiroir"
+        description="Sheet de shadcn (Base UI Dialog), ouvert à droite, pleine largeur sur téléphone. Il porte la fiche du contact."
+      >
+        <ExempleTiroir />
       </Section>
     </main>
   );

@@ -1,6 +1,6 @@
 import type { Contact, ContactRepository, Etape } from "@/data/contact-repository";
 
-import { dateDuJour, estUneDate, joursEntre } from "./dates";
+import { ajouterJours, dateDuJour, estUneDate, joursEntre } from "./dates";
 
 export type { Contact, Etape };
 
@@ -21,6 +21,38 @@ export interface ContactSuivi extends Contact {
   suivante: Etape | null;
   /** Jours écoulés depuis le dernier échange : 0 s'il a eu lieu aujourd'hui. */
   joursDepuisDernierEchange: number | null;
+  /**
+   * Jours écoulés depuis la date de relance : positif en retard, 0 aujourd'hui,
+   * négatif à venir, `null` sans relance.
+   */
+  retardRelance: number | null;
+}
+
+/** Une colonne du tableau : une étape et ses contacts, dans l'ordre d'affichage. */
+export interface ColonneDuTableau extends EtapeDuParcours {
+  contacts: ContactSuivi[];
+}
+
+export type CodeDateRapide = "demain" | "3-jours" | "1-semaine" | "2-semaines";
+
+/** Une date proposée en un clic pour planifier ou reporter une relance. */
+export interface DateRapide {
+  code: CodeDateRapide;
+  /** AAAA-MM-JJ. */
+  date: string;
+}
+
+/** Les relances du jour : celles déjà faites (un échange enregistré aujourd'hui) sur le total. */
+/** Ce qu'un marquage modifie : de quoi revenir en arrière. */
+export interface EtatEchange {
+  dernierEchangeLe: string | null;
+  note: string | null;
+  relanceLe: string | null;
+}
+
+export interface ProgressionDuJour {
+  faites: number;
+  total: number;
 }
 
 /** Un contact de « À relancer aujourd'hui ». */
@@ -108,7 +140,24 @@ function suivre(contact: Contact, jour: string): ContactSuivi {
     suivante: ETAPES[rang + 1]?.code ?? null,
     joursDepuisDernierEchange:
       contact.dernierEchangeLe === null ? null : joursEntre(contact.dernierEchangeLe, jour),
+    retardRelance: contact.relanceLe === null ? null : joursEntre(contact.relanceLe, jour),
   };
+}
+
+function estDue(contact: ContactSuivi): boolean {
+  return contact.retardRelance !== null && contact.retardRelance >= 0;
+}
+
+/**
+ * Ordre d'une colonne du tableau : les relances dues d'abord, la plus en retard en tête,
+ * puis les autres contacts, du plus récent au plus ancien.
+ */
+function ordreDuTableau(a: ContactSuivi, b: ContactSuivi): number {
+  if (estDue(a) !== estDue(b)) return estDue(a) ? -1 : 1;
+  if (estDue(a) && a.retardRelance !== b.retardRelance) {
+    return (b.retardRelance ?? 0) - (a.retardRelance ?? 0);
+  }
+  return b.creeLe.getTime() - a.creeLe.getTime();
 }
 
 const CONTACT_INCONNU = { ok: false, erreur: "Ce contact n'existe plus." } as const;
@@ -119,6 +168,7 @@ const EMAIL_INVALIDE = "Cette adresse e-mail n'est pas valide.";
 const FORME_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const DATE_MANQUANTE = "Indiquez une date de relance.";
+const ETAT_PRECEDENT_INVALIDE = "Impossible d'annuler : l'état précédent n'est pas valide.";
 const PAS_UN_TEXTE = "Ce champ doit contenir du texte.";
 const LONGUEUR_MAX = 200;
 const LONGUEUR_MAX_NOTE = 2000;
@@ -183,9 +233,35 @@ function lireIdentite<C extends Exclude<ChampTexte, "nom" | "note">>(
   return { valeurs, erreurs };
 }
 
+/** Une date AAAA-MM-JJ ou `null` ; toute autre valeur est refusée. */
+function lireDateOuNull(valeur: unknown): { ok: true; date: string | null } | { ok: false } {
+  if (valeur === null) return { ok: true, date: null };
+  if (typeof valeur === "string" && estUneDate(valeur)) return { ok: true, date: valeur };
+  return { ok: false };
+}
+
+/** Sans accents ni majuscules, pour comparer une recherche à un texte. */
+function normaliser(texte: string): string {
+  return texte.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+function correspond(contact: Contact, filtre: string): boolean {
+  const texte = [contact.nom, contact.entreprise, contact.fonction, contact.note]
+    .filter((partie) => partie !== null)
+    .join(" ");
+  return normaliser(texte).includes(filtre);
+}
+
 function aDesErreurs(erreurs: object): boolean {
   return Object.keys(erreurs).length > 0;
 }
+
+const DATES_RAPIDES: readonly { code: CodeDateRapide; jours: number }[] = [
+  { code: "demain", jours: 1 },
+  { code: "3-jours", jours: 3 },
+  { code: "1-semaine", jours: 7 },
+  { code: "2-semaines", jours: 14 },
+];
 
 /** Fuseau de l'utilisateur : c'est à son heure que commence « aujourd'hui ». */
 const FUSEAU_PAR_DEFAUT = "Europe/Paris";
@@ -231,6 +307,44 @@ export function createContactService({
       return tous
         .toSorted((a, b) => b.creeLe.getTime() - a.creeLe.getTime())
         .map((contact) => suivre(contact, jour));
+    },
+
+    /**
+     * Les cinq étapes dans l'ordre, chacune avec ses contacts dans l'ordre de la colonne.
+     * Une recherche ne garde que les contacts dont le nom, l'entreprise, la fonction ou la note
+     * la contient, sans tenir compte des accents ni des majuscules.
+     */
+    async tableau(recherche?: string): Promise<ColonneDuTableau[]> {
+      const jour = aujourdhui();
+      const filtre = typeof recherche === "string" ? normaliser(recherche.trim()) : "";
+      const suivis = (await contacts.lister())
+        .filter((contact) => filtre === "" || correspond(contact, filtre))
+        .map((contact) => suivre(contact, jour))
+        .toSorted(ordreDuTableau);
+      return ETAPES.map((etape) => ({
+        ...etape,
+        contacts: suivis.filter((contact) => contact.etape === etape.code),
+      }));
+    },
+
+    /** Demain, dans 3 jours, dans 1 semaine, dans 2 semaines, comptés depuis aujourd'hui. */
+    datesRapides(): DateRapide[] {
+      const jour = aujourdhui();
+      return DATES_RAPIDES.map(({ code, jours }) => ({ code, date: ajouterJours(jour, jours) }));
+    },
+
+    /**
+     * Faites : les contacts dont un échange a été enregistré aujourd'hui.
+     * À faire : les relances dues aujourd'hui ou en retard, sans échange aujourd'hui.
+     */
+    async progressionDuJour(): Promise<ProgressionDuJour> {
+      const jour = aujourdhui();
+      const tous = await contacts.lister();
+      const faites = tous.filter((c) => c.dernierEchangeLe === jour).length;
+      const aFaire = tous.filter(
+        (c) => c.relanceLe !== null && c.relanceLe <= jour && c.dernierEchangeLe !== jour,
+      ).length;
+      return { faites, total: faites + aFaire };
     },
 
     /** Les étapes dans l'ordre, pour la liste des étapes et la piste. */
@@ -322,6 +436,25 @@ export function createContactService({
       const contact = await contacts.modifier(id, { ...valeurs, nom: valeurs.nom });
       if (!contact) return { ok: false, erreurs: { contact: CONTACT_INCONNU.erreur } };
       return { ok: true, contact: suivre(contact, aujourdhui()) };
+    },
+
+    /** Remet la relance, la note et le dernier échange tels qu'ils étaient avant un marquage. */
+    async annulerMarquage(id: number, precedent: EtatEchange): Promise<ResultatContact> {
+      if (typeof precedent !== "object" || precedent === null) {
+        return { ok: false, erreur: ETAT_PRECEDENT_INVALIDE };
+      }
+      const source = enObjet(precedent);
+      const echange = lireDateOuNull(source.dernierEchangeLe);
+      const relance = lireDateOuNull(source.relanceLe);
+      const note = lireTexte(source.note, "note", LONGUEUR_MAX_NOTE);
+      if (!echange.ok || !relance.ok || !note.ok) return { ok: false, erreur: ETAT_PRECEDENT_INVALIDE };
+      return resultat(
+        await contacts.enregistrerEchange(id, {
+          dernierEchangeLe: echange.date,
+          note: note.texte,
+          relanceLe: relance.date,
+        }),
+      );
     },
 
     async supprimer(id: number): Promise<{ ok: true } | { ok: false; erreur: string }> {
