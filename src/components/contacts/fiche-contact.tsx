@@ -114,6 +114,7 @@ export function FicheContact({
         facultatif
         autoComplete="organization"
         defaultValue={valeurs.entreprise}
+        erreur={etat.erreurs?.entreprise}
       />
       <Champ
         id={`${id}-fonction`}
@@ -122,6 +123,7 @@ export function FicheContact({
         facultatif
         autoComplete="organization-title"
         defaultValue={valeurs.fonction}
+        erreur={etat.erreurs?.fonction}
       />
       <Champ
         id={`${id}-email`}
@@ -141,6 +143,7 @@ export function FicheContact({
         type="tel"
         autoComplete="tel"
         defaultValue={valeurs.telephone}
+        erreur={etat.erreurs?.telephone}
       />
       <div className="flex flex-wrap gap-2 sm:col-span-2">
         <Button type="submit" disabled={enCours}>

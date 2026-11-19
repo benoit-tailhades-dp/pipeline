@@ -31,7 +31,9 @@ export function FormulaireContact({
   const idNom = `${id}-nom`;
   const idErreurNom = `${id}-nom-erreur`;
   const idEntreprise = `${id}-entreprise`;
+  const idErreurEntreprise = `${id}-entreprise-erreur`;
   const erreurNom = etat.erreurs?.nom;
+  const erreurEntreprise = etat.erreurs?.entreprise;
 
   return (
     <Card>
@@ -68,7 +70,14 @@ export function FormulaireContact({
               name="entreprise"
               autoComplete="organization"
               defaultValue={etat.valeurs?.entreprise}
+              aria-invalid={erreurEntreprise ? true : undefined}
+              aria-describedby={erreurEntreprise ? idErreurEntreprise : undefined}
             />
+            {erreurEntreprise && (
+              <p id={idErreurEntreprise} className="text-sm text-destructive">
+                {erreurEntreprise}
+              </p>
+            )}
           </div>
           <div className="sm:col-span-2">
             <Button type="submit" disabled={enCours}>

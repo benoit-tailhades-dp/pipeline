@@ -42,7 +42,10 @@ export interface SaisieContact {
 
 export interface ErreursContact {
   nom?: string;
+  entreprise?: string;
+  fonction?: string;
   email?: string;
+  telephone?: string;
   /** Erreur qui ne porte sur aucun champ, comme un contact supprimé entre-temps. */
   contact?: string;
 }
@@ -62,6 +65,17 @@ export type ResultatModification =
 export type ResultatAjout =
   | { ok: true; contact: Contact }
   | { ok: false; erreurs: ErreursContact };
+
+export interface ErreursEchange {
+  note?: string;
+  prochaineRelance?: string;
+  /** Erreur qui ne porte sur aucun champ, comme un contact supprimé entre-temps. */
+  contact?: string;
+}
+
+export type ResultatMarquage =
+  | { ok: true; contact: ContactSuivi }
+  | { ok: false; erreurs: ErreursEchange };
 
 export type ResultatContact = { ok: true; contact: ContactSuivi } | { ok: false; erreur: string };
 
@@ -104,9 +118,73 @@ const EMAIL_INVALIDE = "Cette adresse e-mail n'est pas valide.";
 /** Une partie locale, un @, un domaine avec au moins un point, sans espace. */
 const FORME_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** La saisie sans espaces autour, ou `null` si elle est vide. */
-function valeurOuNull(saisie: string | undefined): string | null {
-  return saisie?.trim() || null;
+const DATE_MANQUANTE = "Indiquez une date de relance.";
+const PAS_UN_TEXTE = "Ce champ doit contenir du texte.";
+const LONGUEUR_MAX = 200;
+const LONGUEUR_MAX_NOTE = 2000;
+
+/** Sujet des messages de longueur : « Le nom ne doit pas dépasser… ». */
+const SUJETS = {
+  nom: "Le nom",
+  entreprise: "L'entreprise",
+  fonction: "La fonction",
+  email: "L'e-mail",
+  telephone: "Le téléphone",
+  note: "La note",
+} as const;
+
+type ChampTexte = keyof typeof SUJETS;
+
+/** « 2 000 » : milliers séparés par une espace, comme dans les messages. */
+function enClair(nombre: number): string {
+  return String(nombre).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+}
+
+/**
+ * Les Server Actions s'appellent directement : à l'exécution, rien ne garantit
+ * qu'une saisie est un objet, ni que ses champs sont des textes de taille raisonnable.
+ */
+function enObjet(saisie: unknown): Record<string, unknown> {
+  return typeof saisie === "object" && saisie !== null ? (saisie as Record<string, unknown>) : {};
+}
+
+/**
+ * Lit un champ texte : sans espaces autour, `null` s'il est absent ou vide,
+ * refusé s'il n'est pas un texte ou dépasse sa longueur maximale.
+ */
+function lireTexte(
+  valeur: unknown,
+  champ: ChampTexte,
+  max: number,
+): { ok: true; texte: string | null } | { ok: false; erreur: string } {
+  if (valeur === undefined || valeur === null) return { ok: true, texte: null };
+  if (typeof valeur !== "string") return { ok: false, erreur: PAS_UN_TEXTE };
+  const texte = valeur.trim();
+  if (texte.length > max) {
+    return { ok: false, erreur: `${SUJETS[champ]} ne doit pas dépasser ${enClair(max)} caractères.` };
+  }
+  return { ok: true, texte: texte || null };
+}
+
+/** Lit le nom, obligatoire, et les autres champs d'identité (200 caractères au plus chacun). */
+function lireIdentite<C extends Exclude<ChampTexte, "nom" | "note">>(
+  saisie: unknown,
+  autres: readonly C[],
+) {
+  const source = enObjet(saisie);
+  const valeurs = {} as Record<"nom" | C, string | null>;
+  const erreurs: Partial<Record<"nom" | C, string>> = {};
+  for (const champ of ["nom" as const, ...autres]) {
+    const lecture = lireTexte(source[champ], champ, LONGUEUR_MAX);
+    if (lecture.ok) valeurs[champ] = lecture.texte;
+    else erreurs[champ] = lecture.erreur;
+  }
+  if (!erreurs.nom && valeurs.nom === null) erreurs.nom = NOM_MANQUANT;
+  return { valeurs, erreurs };
+}
+
+function aDesErreurs(erreurs: object): boolean {
+  return Object.keys(erreurs).length > 0;
 }
 
 /** Fuseau de l'utilisateur : c'est à son heure que commence « aujourd'hui ». */
@@ -135,14 +213,11 @@ export function createContactService({
 
   return {
     async ajouter(saisie: SaisieContact): Promise<ResultatAjout> {
-      const nom = saisie.nom.trim();
-      if (nom === "") {
-        return { ok: false, erreurs: { nom: NOM_MANQUANT } };
-      }
-      const entreprise = valeurOuNull(saisie.entreprise);
+      const { valeurs, erreurs } = lireIdentite(saisie, ["entreprise"] as const);
+      if (aDesErreurs(erreurs) || valeurs.nom === null) return { ok: false, erreurs };
       const contact = await contacts.ajouter({
-        nom,
-        entreprise,
+        nom: valeurs.nom,
+        entreprise: valeurs.entreprise,
         etape: ETAPE_INITIALE,
         creeLe: now(),
       });
@@ -174,13 +249,15 @@ export function createContactService({
 
     /** Corrige l'étape du contact, vers l'avant ou vers l'arrière. */
     async changerEtape(id: number, etape: string): Promise<ResultatContact> {
-      if (!estUneEtape(etape)) return { ok: false, erreur: "Cette étape n'existe pas." };
+      if (typeof etape !== "string" || !estUneEtape(etape)) {
+        return { ok: false, erreur: "Cette étape n'existe pas." };
+      }
       return enregistrerEtape(id, etape);
     },
 
     /** Planifie ou déplace la relance. La date (AAAA-MM-JJ) tombe aujourd'hui ou plus tard. */
     async planifierRelance(id: number, date: string): Promise<ResultatContact> {
-      if (!estUneDate(date)) return { ok: false, erreur: "Indiquez une date de relance." };
+      if (typeof date !== "string" || !estUneDate(date)) return { ok: false, erreur: DATE_MANQUANTE };
       if (date < aujourdhui()) {
         return { ok: false, erreur: "La relance doit tomber aujourd'hui ou plus tard." };
       }
@@ -195,45 +272,54 @@ export function createContactService({
      * Enregistre l'échange du jour. Sans note, la note précédente est gardée.
      * Sans relance suivante, aucune relance n'est planifiée.
      */
-    async marquerRelance(id: number, saisie: SaisieEchange): Promise<ResultatContact> {
+    async marquerRelance(id: number, saisie: SaisieEchange): Promise<ResultatMarquage> {
       const jour = aujourdhui();
-      const prochaineRelance = saisie.prochaineRelance?.trim() || null;
-      if (prochaineRelance !== null) {
-        if (!estUneDate(prochaineRelance)) {
-          return { ok: false, erreur: "Indiquez une date de relance." };
-        }
-        // Une relance aujourd'hui garderait le contact dans la liste du jour.
-        if (prochaineRelance <= jour) {
-          return { ok: false, erreur: "La relance suivante doit tomber après aujourd'hui." };
+      const source = enObjet(saisie);
+      const erreurs: ErreursEchange = {};
+
+      const note = lireTexte(source.note, "note", LONGUEUR_MAX_NOTE);
+      if (!note.ok) erreurs.note = note.erreur;
+
+      let prochaineRelance: string | null = null;
+      const date = source.prochaineRelance;
+      if (date !== undefined && date !== null) {
+        const texte = typeof date === "string" ? date.trim() : null;
+        if (texte === null || (texte !== "" && !estUneDate(texte))) {
+          erreurs.prochaineRelance = DATE_MANQUANTE;
+        } else if (texte !== "" && texte <= jour) {
+          // Une relance aujourd'hui garderait le contact dans la liste du jour.
+          erreurs.prochaineRelance = "La relance suivante doit tomber après aujourd'hui.";
+        } else {
+          prochaineRelance = texte || null;
         }
       }
+      if (aDesErreurs(erreurs)) return { ok: false, erreurs };
+
       const contact = await contacts.trouver(id);
-      if (!contact) return CONTACT_INCONNU;
-      return resultat(
-        await contacts.enregistrerEchange(id, {
-          dernierEchangeLe: jour,
-          note: saisie.note?.trim() || contact.note,
-          relanceLe: prochaineRelance,
-        }),
-      );
+      if (!contact) return { ok: false, erreurs: { contact: CONTACT_INCONNU.erreur } };
+      const enregistre = await contacts.enregistrerEchange(id, {
+        dernierEchangeLe: jour,
+        note: (note.ok && note.texte) || contact.note,
+        relanceLe: prochaineRelance,
+      });
+      if (!enregistre) return { ok: false, erreurs: { contact: CONTACT_INCONNU.erreur } };
+      return { ok: true, contact: suivre(enregistre, jour) };
     },
 
     /** Corrige la fiche. Le nom est obligatoire, l'e-mail facultatif mais bien formé. */
     async modifier(id: number, saisie: SaisieFiche): Promise<ResultatModification> {
-      const nom = saisie.nom.trim();
-      const email = valeurOuNull(saisie.email);
-      const erreurs: ErreursContact = {};
-      if (nom === "") erreurs.nom = NOM_MANQUANT;
-      if (email !== null && !FORME_EMAIL.test(email)) erreurs.email = EMAIL_INVALIDE;
-      if (erreurs.nom || erreurs.email) return { ok: false, erreurs };
+      const { valeurs, erreurs } = lireIdentite(saisie, [
+        "entreprise",
+        "fonction",
+        "email",
+        "telephone",
+      ] as const);
+      if (!erreurs.email && valeurs.email !== null && !FORME_EMAIL.test(valeurs.email)) {
+        erreurs.email = EMAIL_INVALIDE;
+      }
+      if (aDesErreurs(erreurs) || valeurs.nom === null) return { ok: false, erreurs };
 
-      const contact = await contacts.modifier(id, {
-        nom,
-        entreprise: valeurOuNull(saisie.entreprise),
-        fonction: valeurOuNull(saisie.fonction),
-        email,
-        telephone: valeurOuNull(saisie.telephone),
-      });
+      const contact = await contacts.modifier(id, { ...valeurs, nom: valeurs.nom });
       if (!contact) return { ok: false, erreurs: { contact: CONTACT_INCONNU.erreur } };
       return { ok: true, contact: suivre(contact, aujourdhui()) };
     },

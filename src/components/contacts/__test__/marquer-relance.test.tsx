@@ -52,7 +52,7 @@ describe("MarquerRelance", () => {
 
   it("affiche le refus du service sous la relance suivante, sans perdre la saisie", async () => {
     const message = "La relance suivante doit tomber après aujourd'hui.";
-    afficher(async (_id, saisie) => ({ erreur: message, valeurs: saisie }));
+    afficher(async (_id, saisie) => ({ erreurs: { prochaineRelance: message }, valeurs: saisie }));
 
     fireEvent.change(screen.getByLabelText(/Note/), { target: { value: "Pas joignable" } });
     fireEvent.change(screen.getByLabelText(/Relance suivante/), {
@@ -66,5 +66,31 @@ describe("MarquerRelance", () => {
     expect(date.getAttribute("aria-describedby")).toBe(erreur.id);
     expect(date.value).toBe("2026-11-18");
     expect((screen.getByLabelText(/Note/) as HTMLInputElement).value).toBe("Pas joignable");
+  });
+
+  it("affiche le refus d'une note trop longue sous la note, sans perdre la saisie", async () => {
+    const message = "La note ne doit pas dépasser 2 000 caractères.";
+    afficher(async (_id, saisie) => ({ erreurs: { note: message }, valeurs: saisie }));
+
+    fireEvent.change(screen.getByLabelText(/Note/), { target: { value: "Très longue note" } });
+    marquer();
+
+    const erreur = await screen.findByText(message);
+    const note = screen.getByLabelText(/Note/) as HTMLInputElement;
+    expect(note.getAttribute("aria-invalid")).toBe("true");
+    expect(note.getAttribute("aria-describedby")).toBe(erreur.id);
+    expect(note.value).toBe("Très longue note");
+    expect(screen.getByLabelText(/Relance suivante/).getAttribute("aria-invalid")).toBeNull();
+  });
+
+  it("affiche l'erreur générale quand le contact n'existe plus", async () => {
+    afficher(async (_id, saisie) => ({
+      erreurs: { contact: "Ce contact n'existe plus." },
+      valeurs: saisie,
+    }));
+
+    marquer();
+
+    await screen.findByText("Ce contact n'existe plus.");
   });
 });

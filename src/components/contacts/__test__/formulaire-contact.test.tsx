@@ -47,4 +47,16 @@ describe("FormulaireContact", () => {
       "Ateliers Vernier",
     );
   });
+
+  it("affiche l'erreur du service sous le champ Entreprise", () => {
+    const message = "L'entreprise ne doit pas dépasser 200 caractères.";
+    render(
+      <FormulaireContact action={actionInerte} etatInitial={{ erreurs: { entreprise: message } }} />,
+    );
+
+    const entreprise = screen.getByLabelText(/Entreprise/);
+    const erreur = screen.getByText(message);
+    expect(entreprise.getAttribute("aria-invalid")).toBe("true");
+    expect(entreprise.getAttribute("aria-describedby")).toBe(erreur.id);
+  });
 });

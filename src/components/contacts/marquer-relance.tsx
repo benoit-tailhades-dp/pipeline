@@ -5,6 +5,7 @@ import { useActionState, useId } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import type { ErreursEchange } from "@/services/contact-service";
 
 export interface SaisieMarquage {
   note: string;
@@ -12,7 +13,7 @@ export interface SaisieMarquage {
 }
 
 export interface EtatMarquage {
-  erreur?: string;
+  erreurs?: ErreursEchange;
   /** Saisie renvoyée avec une erreur, pour ne pas la perdre au réaffichage. */
   valeurs?: SaisieMarquage;
 }
@@ -39,10 +40,16 @@ export function MarquerRelance({
   const prefixe = useId();
   const idNote = `${prefixe}-note`;
   const idDate = `${prefixe}-date`;
-  const idErreur = `${prefixe}-erreur`;
+  const idErreurNote = `${prefixe}-note-erreur`;
+  const idErreurDate = `${prefixe}-date-erreur`;
+  const erreurNote = etat.erreurs?.note;
+  const erreurDate = etat.erreurs?.prochaineRelance;
 
   return (
     <form action={envoyer} className="grid gap-3 rounded-lg bg-secondary p-3 pl-4 sm:grid-cols-2">
+      {etat.erreurs?.contact && (
+        <p className="text-sm text-destructive sm:col-span-2">{etat.erreurs.contact}</p>
+      )}
       <div className="grid content-start gap-2">
         <Label htmlFor={idNote}>
           Note <span className="font-normal text-muted-foreground">(facultatif)</span>
@@ -53,7 +60,14 @@ export function MarquerRelance({
           autoComplete="off"
           defaultValue={etat.valeurs?.note}
           placeholder="Ce qui s’est dit"
+          aria-invalid={erreurNote ? true : undefined}
+          aria-describedby={erreurNote ? idErreurNote : undefined}
         />
+        {erreurNote && (
+          <p id={idErreurNote} className="text-sm text-destructive">
+            {erreurNote}
+          </p>
+        )}
       </div>
       <div className="grid content-start gap-2">
         <Label htmlFor={idDate}>
@@ -64,12 +78,12 @@ export function MarquerRelance({
           name="prochaine-relance"
           type="date"
           defaultValue={etat.valeurs?.prochaineRelance}
-          aria-invalid={etat.erreur ? true : undefined}
-          aria-describedby={etat.erreur ? idErreur : undefined}
+          aria-invalid={erreurDate ? true : undefined}
+          aria-describedby={erreurDate ? idErreurDate : undefined}
         />
-        {etat.erreur && (
-          <p id={idErreur} className="text-sm text-destructive">
-            {etat.erreur}
+        {erreurDate && (
+          <p id={idErreurDate} className="text-sm text-destructive">
+            {erreurDate}
           </p>
         )}
       </div>
