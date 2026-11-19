@@ -21,6 +21,8 @@ Lot 1 livré : ajout et liste des contacts sur l'accueil (`contact-repository`, 
 
 Lot 2 livré : étapes du pipeline. Le service porte l'ordre des étapes et leur température (`etapes()`, `avancer`, `changerEtape`) et renvoie des `ContactSuivi` (température, position, étape suivante). La carte est `src/components/contacts/carte-contact.tsx` : elle reçoit ses Server Actions en props pour rester testable. Une colonne ajoutée à une table existante passe par `ajouterColonneAbsente` dans `schema.ts`, pour migrer les bases déjà créées.
 
+Lot 3 livré : relance planifiée sur la carte (`RelanceContact`). Les dates du calendrier sont des chaînes `AAAA-MM-JJ` (`DateCalendrier`), comparables telles quelles. « Aujourd'hui » se calcule dans le service avec `dateDuJour(now(), fuseau)` (`src/services/dates.ts`, fuseau `Europe/Paris` par défaut). La présentation formate avec `src/components/contacts/dates.ts`. Les Server Actions de la carte passent dans une seule prop `actions` (`ActionsContact`). Les requêtes SQL du repository sont des constantes en tête de fichier.
+
 Le découpage en lots, avec les critères d'acceptation et le statut de chaque lot, est dans `LOTS.md`.
 
 ## Organisation des couches

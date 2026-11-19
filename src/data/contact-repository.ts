@@ -3,6 +3,9 @@
  * Ce fichier n'importe rien : le service en dépend sans dépendre de la base.
  */
 
+/** Date du calendrier au format AAAA-MM-JJ, sans heure ni fuseau. */
+export type DateCalendrier = string;
+
 /** Étapes du pipeline. Leur ordre et leur température sont des règles du service. */
 export type Etape = "a-contacter" | "premier-echange" | "demo" | "proposition" | "gagne";
 
@@ -11,6 +14,7 @@ export interface Contact {
   nom: string;
   entreprise: string | null;
   etape: Etape;
+  relanceLe: DateCalendrier | null;
   creeLe: Date;
 }
 
@@ -30,4 +34,6 @@ export interface ContactRepository {
   trouver(id: number): Promise<Contact | null>;
   /** Enregistre l'étape et renvoie le contact modifié, ou `null` s'il n'existe pas. */
   changerEtape(id: number, etape: Etape): Promise<Contact | null>;
+  /** Enregistre la date de relance (`null` la retire), ou `null` si le contact n'existe pas. */
+  changerRelance(id: number, date: DateCalendrier | null): Promise<Contact | null>;
 }

@@ -16,6 +16,9 @@ const claire = {
   creeLe: new Date("2026-11-18T09:15:42.123Z"),
 };
 
+/** Champs que l'ajout laisse vides. */
+const vides = { relanceLe: null };
+
 describe("LibsqlContactRepository", () => {
   let db: Db;
   let repository: ContactRepository;
@@ -35,7 +38,7 @@ describe("LibsqlContactRepository", () => {
 
     const ajoute = await repository.ajouter(claire);
 
-    expect(ajoute).toEqual({ id: expect.any(Number), ...claire });
+    expect(ajoute).toEqual({ id: expect.any(Number), ...claire, ...vides });
     await expect(repository.lister()).resolves.toEqual([ajoute]);
   });
 
@@ -100,6 +103,39 @@ describe("LibsqlContactRepository", () => {
       await expect(repository.lister()).resolves.toEqual([ajoute]);
     });
   });
+
+  describe("changerRelance", () => {
+    it("enregistre la date de relance et renvoie le contact modifié", async () => {
+      const ajoute = await repository.ajouter(claire);
+
+      const modifie = await repository.changerRelance(ajoute.id, "2026-11-24");
+
+      expect(modifie).toEqual({ ...ajoute, relanceLe: "2026-11-24" });
+      await expect(repository.trouver(ajoute.id)).resolves.toEqual(modifie);
+    });
+
+    it("retire la relance avec null", async () => {
+      const ajoute = await repository.ajouter(claire);
+      await repository.changerRelance(ajoute.id, "2026-11-24");
+
+      await repository.changerRelance(ajoute.id, null);
+
+      await expect(repository.trouver(ajoute.id)).resolves.toMatchObject({ relanceLe: null });
+    });
+
+    it("ne touche pas aux autres contacts", async () => {
+      const marc = await repository.ajouter({ ...claire, nom: "Marc Delorme" });
+      const ajoute = await repository.ajouter(claire);
+
+      await repository.changerRelance(ajoute.id, "2026-11-24");
+
+      await expect(repository.trouver(marc.id)).resolves.toEqual(marc);
+    });
+
+    it("renvoie null pour un contact inconnu", async () => {
+      await expect(repository.changerRelance(42, "2026-11-24")).resolves.toBeNull();
+    });
+  });
 });
 
 describe("LibsqlContactRepository sur un fichier", () => {
@@ -148,6 +184,19 @@ describe("LibsqlContactRepository sur un fichier", () => {
     ).resolves.toMatchObject({ etape: "demo" });
   });
 
+  it("conserve la relance après un redémarrage", async () => {
+    const avant = createDb(url);
+    await appliquerSchema(avant);
+    const repository = createLibsqlContactRepository(avant);
+    const ajoute = await repository.ajouter(claire);
+    await repository.changerRelance(ajoute.id, "2026-11-24");
+    avant.close();
+
+    await expect(
+      apresRedemarrage((repository) => repository.trouver(ajoute.id)),
+    ).resolves.toMatchObject({ relanceLe: "2026-11-24" });
+  });
+
   it("place à « À contacter » les contacts d'une base créée avant les étapes", async () => {
     // Schéma du lot 1, sans colonne `etape` : c'est l'état de `local.db` avant ce lot.
     const ancienne = createDb(url);
@@ -161,7 +210,7 @@ describe("LibsqlContactRepository sur un fichier", () => {
     ancienne.close();
 
     await expect(apresRedemarrage((repository) => repository.lister())).resolves.toEqual([
-      { id: expect.any(Number), ...claire, etape: "a-contacter" },
+      { id: expect.any(Number), ...claire, ...vides, etape: "a-contacter" },
     ]);
   });
 });

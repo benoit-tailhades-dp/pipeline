@@ -36,7 +36,7 @@ Statut : livré
 
 ## Lot 3 : Planifier une relance
 
-Statut : à faire
+Statut : livré
 
 **Parcours.** Sur la carte d'un contact, je choisis une date de relance, que la carte affiche ensuite. Une date passée est refusée. Je peux aussi modifier ou retirer la relance.
 

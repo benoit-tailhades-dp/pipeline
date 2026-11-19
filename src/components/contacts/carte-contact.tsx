@@ -28,6 +28,8 @@ import type {
   Temperature,
 } from "@/services/contact-service";
 
+import { RelanceContact, type EtatRelance } from "./relance-contact";
+
 const LIBELLES_ETAPES: Record<Etape, string> = {
   "a-contacter": "À contacter",
   "premier-echange": "Premier échange",
@@ -94,16 +96,22 @@ function Piste({
   );
 }
 
+/** Server Actions de la carte, reçues en props pour que le composant reste testable. */
+export interface ActionsContact {
+  avancer: (id: number) => Promise<void>;
+  changerEtape: (id: number, etape: Etape) => Promise<void>;
+  planifierRelance: (id: number, date: string) => Promise<EtatRelance>;
+  retirerRelance: (id: number) => Promise<void>;
+}
+
 export function CarteContact({
   contact,
   etapes,
-  avancerAction,
-  changerEtapeAction,
+  actions,
 }: {
   contact: ContactSuivi;
   etapes: readonly EtapeDuParcours[];
-  avancerAction: (id: number) => Promise<void>;
-  changerEtapeAction: (id: number, etape: Etape) => Promise<void>;
+  actions: ActionsContact;
 }) {
   const [enCours, demarrer] = useTransition();
   const idEtape = useId();
@@ -139,7 +147,7 @@ export function CarteContact({
               disabled={enCours}
               onValueChange={(etape) => {
                 if (etape && etape !== contact.etape) {
-                  demarrer(() => changerEtapeAction(contact.id, etape));
+                  demarrer(() => actions.changerEtape(contact.id, etape));
                 }
               }}
             >
@@ -159,12 +167,17 @@ export function CarteContact({
             <Button
               size="lg"
               disabled={enCours}
-              onClick={() => demarrer(() => avancerAction(contact.id))}
+              onClick={() => demarrer(() => actions.avancer(contact.id))}
             >
               Étape suivante
             </Button>
           )}
         </div>
+        <RelanceContact
+          contact={contact}
+          planifierAction={actions.planifierRelance}
+          retirerAction={actions.retirerRelance}
+        />
       </CardContent>
     </Card>
   );

@@ -1,68 +1,32 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { ContactSuivi, EtapeDuParcours } from "@/services/contact-service";
+import type { ContactSuivi } from "@/services/contact-service";
 
-import { CarteContact } from "../carte-contact";
+import { CarteContact, type ActionsContact } from "../carte-contact";
+import { actionsInertes, contactSuivi, etapes } from "./fixtures";
 
-/** Liste telle que la renvoie le service : la présentation ne la reconstruit pas. */
-const etapes: EtapeDuParcours[] = [
-  { code: "a-contacter", temperature: "froid" },
-  { code: "premier-echange", temperature: "froid" },
-  { code: "demo", temperature: "tiede" },
-  { code: "proposition", temperature: "chaud" },
-  { code: "gagne", temperature: "signe" },
-];
+const nouveau = contactSuivi();
 
-const nouveau: ContactSuivi = {
-  id: 7,
-  nom: "Claire Vasseur",
-  entreprise: "Ateliers Vernier",
-  creeLe: new Date("2026-11-18T09:00:00.000Z"),
-  etape: "a-contacter",
-  temperature: "froid",
-  position: 1,
-  suivante: "premier-echange",
-};
-
-const enDemo: ContactSuivi = {
-  ...nouveau,
+const enDemo = contactSuivi({
   etape: "demo",
   temperature: "tiede",
   position: 3,
   suivante: "proposition",
-};
+});
 
-const enProposition: ContactSuivi = {
-  ...nouveau,
+const enProposition = contactSuivi({
   etape: "proposition",
   temperature: "chaud",
   position: 4,
   suivante: "gagne",
-};
+});
 
-const gagne: ContactSuivi = {
-  ...nouveau,
-  etape: "gagne",
-  temperature: "signe",
-  position: 5,
-  suivante: null,
-};
+const gagne = contactSuivi({ etape: "gagne", temperature: "signe", position: 5, suivante: null });
 
-function afficher(
-  contact: ContactSuivi,
-  actions: {
-    avancerAction?: (id: number) => Promise<void>;
-    changerEtapeAction?: (id: number, etape: string) => Promise<void>;
-  } = {},
-) {
+function afficher(contact: ContactSuivi, actions: Partial<ActionsContact> = {}) {
   return render(
-    <CarteContact
-      contact={contact}
-      etapes={etapes}
-      avancerAction={actions.avancerAction ?? (async () => {})}
-      changerEtapeAction={actions.changerEtapeAction ?? (async () => {})}
-    />,
+    <CarteContact contact={contact} etapes={etapes} actions={{ ...actionsInertes, ...actions }} />,
   );
 }
 
@@ -123,12 +87,12 @@ describe("CarteContact", () => {
   });
 
   it("transmet l'identifiant du contact quand je clique sur « Étape suivante »", () => {
-    const avancerAction = vi.fn(async () => {});
-    afficher(enDemo, { avancerAction });
+    const avancer = vi.fn(async () => {});
+    afficher(enDemo, { avancer });
 
     fireEvent.click(screen.getByRole("button", { name: "Étape suivante" }));
 
-    expect(avancerAction).toHaveBeenCalledExactlyOnceWith(7);
+    expect(avancer).toHaveBeenCalledExactlyOnceWith(7);
   });
 
   it("ne propose pas « Étape suivante » pour un contact « Gagné »", () => {
@@ -140,8 +104,8 @@ describe("CarteContact", () => {
   });
 
   it("transmet l'étape choisie dans la liste des étapes", async () => {
-    const changerEtapeAction = vi.fn(async () => {});
-    afficher(enProposition, { changerEtapeAction });
+    const changerEtape = vi.fn(async () => {});
+    afficher(enProposition, { changerEtape });
 
     expect(etapeAffichee()).toBe("Proposition envoyée");
     fireEvent.click(menuEtape());
@@ -158,6 +122,12 @@ describe("CarteContact", () => {
     fireEvent.pointerDown(premierEchange, { pointerType: "mouse" });
     fireEvent.click(premierEchange);
 
-    expect(changerEtapeAction).toHaveBeenCalledExactlyOnceWith(7, "premier-echange");
+    expect(changerEtape).toHaveBeenCalledExactlyOnceWith(7, "premier-echange");
+  });
+
+  it("affiche la relance planifiée", () => {
+    afficher(contactSuivi({ relanceLe: "2026-11-24" }));
+
+    screen.getByText("Relance le 24 nov.");
   });
 });
