@@ -51,7 +51,7 @@ export async function retirerRelance(id: number): Promise<void> {
 
 export async function marquerRelance(id: number, saisie: SaisieMarquage): Promise<EtatMarquage> {
   const resultat = await (await contactService()).marquerRelance(id, saisie);
-  if (!resultat.ok) return { erreur: resultat.erreur, valeurs: saisie };
+  if (!resultat.ok) return { erreurs: resultat.erreurs, valeurs: saisie };
   refresh();
   return {};
 }

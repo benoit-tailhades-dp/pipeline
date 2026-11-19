@@ -95,4 +95,26 @@ describe("FicheContact", () => {
 
     expect(onAnnule).toHaveBeenCalledOnce();
   });
+
+  it.each([
+    ["entreprise", /Entreprise/, "L'entreprise ne doit pas dépasser 200 caractères."],
+    ["fonction", /Fonction/, "La fonction ne doit pas dépasser 200 caractères."],
+    ["telephone", /Téléphone/, "Le téléphone ne doit pas dépasser 200 caractères."],
+  ] as const)("affiche le refus du champ %s sous ce champ", async (nom, libelle, message) => {
+    afficher(async (_id, valeurs) => ({ erreurs: { [nom]: message }, valeurs }));
+
+    enregistrer();
+
+    const erreur = await screen.findByText(message);
+    expect(champ(libelle).getAttribute("aria-invalid")).toBe("true");
+    expect(champ(libelle).getAttribute("aria-describedby")).toBe(erreur.id);
+  });
+
+  it("affiche l'erreur générale quand le contact n'existe plus", async () => {
+    afficher(async (_id, valeurs) => ({ erreurs: { contact: "Ce contact n'existe plus." }, valeurs }));
+
+    enregistrer();
+
+    await screen.findByText("Ce contact n'existe plus.");
+  });
 });

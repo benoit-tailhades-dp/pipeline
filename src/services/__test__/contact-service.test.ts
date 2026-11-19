@@ -2,7 +2,13 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import type { Contact, ContactRepository, Etape } from "@/data/contact-repository";
 
-import { createContactService, type ContactService } from "../contact-service";
+import {
+  createContactService,
+  type ContactService,
+  type SaisieContact,
+  type SaisieEchange,
+  type SaisieFiche,
+} from "../contact-service";
 
 /** Faux repository en mémoire : il renvoie les contacts dans l'ordre d'insertion. */
 function fauxRepository(): ContactRepository {
@@ -541,7 +547,7 @@ describe("ContactService", () => {
 
         await expect(service.marquerRelance(contact.id, { prochaineRelance })).resolves.toEqual({
           ok: false,
-          erreur: "La relance suivante doit tomber après aujourd'hui.",
+          erreurs: { prochaineRelance: "La relance suivante doit tomber après aujourd'hui." },
         });
         await expect(repository.trouver(contact.id)).resolves.toMatchObject({
           dernierEchangeLe: null,
@@ -555,13 +561,13 @@ describe("ContactService", () => {
 
       await expect(
         service.marquerRelance(contact.id, { prochaineRelance: "2 décembre" }),
-      ).resolves.toEqual({ ok: false, erreur: "Indiquez une date de relance." });
+      ).resolves.toEqual({ ok: false, erreurs: { prochaineRelance: "Indiquez une date de relance." } });
     });
 
     it("refuse un contact inconnu", async () => {
       await expect(service.marquerRelance(42, {})).resolves.toEqual({
         ok: false,
-        erreur: "Ce contact n'existe plus.",
+        erreurs: { contact: "Ce contact n'existe plus." },
       });
     });
   });
@@ -702,6 +708,216 @@ describe("ContactService", () => {
       await expect(service.supprimer(42)).resolves.toEqual({
         ok: false,
         erreur: "Ce contact n'existe plus.",
+      });
+    });
+  });
+
+  describe("saisies venues de l'extérieur", () => {
+    // Les Server Actions s'appellent directement : à l'exécution, rien ne garantit
+    // le type ni la taille de ce qu'elles transmettent au service.
+    const PAS_UN_TEXTE = "Ce champ doit contenir du texte.";
+    const texteDe = (longueur: number) => "a".repeat(longueur);
+    /** Contourne le typage pour simuler une valeur reçue telle quelle. */
+    const brut = <T>(valeur: unknown) => valeur as T;
+
+    describe("ajouter", () => {
+      it.each([42, true, {}, ["Claire Vasseur"]])(
+        "refuse le nom %j, qui n'est pas un texte, sans créer de contact",
+        async (nom) => {
+          await expect(service.ajouter({ nom: brut<string>(nom) })).resolves.toEqual({
+            ok: false,
+            erreurs: { nom: PAS_UN_TEXTE },
+          });
+          await expect(repository.lister()).resolves.toEqual([]);
+        },
+      );
+
+      it("traite un nom null comme un nom manquant", async () => {
+        await expect(service.ajouter({ nom: brut<string>(null) })).resolves.toEqual({
+          ok: false,
+          erreurs: { nom: "Indiquez le nom du contact." },
+        });
+      });
+
+      it("traite une saisie qui n'est pas un objet comme une saisie vide", async () => {
+        await expect(service.ajouter(brut<SaisieContact>(null))).resolves.toEqual({
+          ok: false,
+          erreurs: { nom: "Indiquez le nom du contact." },
+        });
+      });
+
+      it("accepte un nom de 200 caractères", async () => {
+        const resultat = await service.ajouter({ nom: texteDe(200) });
+
+        expect(resultat.ok).toBe(true);
+      });
+
+      it("refuse un nom de plus de 200 caractères, espaces autour non comptés", async () => {
+        await expect(service.ajouter({ nom: texteDe(201) })).resolves.toEqual({
+          ok: false,
+          erreurs: { nom: "Le nom ne doit pas dépasser 200 caractères." },
+        });
+        await expect(service.ajouter({ nom: `  ${texteDe(200)}  ` })).resolves.toMatchObject({
+          ok: true,
+        });
+        await expect(repository.lister()).resolves.toHaveLength(1);
+      });
+
+      it("refuse une entreprise trop longue ou qui n'est pas un texte", async () => {
+        await expect(
+          service.ajouter({ nom: "Claire Vasseur", entreprise: texteDe(201) }),
+        ).resolves.toEqual({
+          ok: false,
+          erreurs: { entreprise: "L'entreprise ne doit pas dépasser 200 caractères." },
+        });
+        await expect(
+          service.ajouter({ nom: "Claire Vasseur", entreprise: brut<string>(42) }),
+        ).resolves.toEqual({ ok: false, erreurs: { entreprise: PAS_UN_TEXTE } });
+        await expect(repository.lister()).resolves.toEqual([]);
+      });
+    });
+
+    describe("modifier", () => {
+      const fiche = {
+        nom: "Claire Vasseur",
+        entreprise: "Vernier Industrie",
+        fonction: "Responsable PLM",
+        email: "claire.vasseur@example.com",
+        telephone: "06 12 34 56 78",
+      };
+
+      it.each([
+        ["nom", "Le nom ne doit pas dépasser 200 caractères."],
+        ["entreprise", "L'entreprise ne doit pas dépasser 200 caractères."],
+        ["fonction", "La fonction ne doit pas dépasser 200 caractères."],
+        ["telephone", "Le téléphone ne doit pas dépasser 200 caractères."],
+      ] as const)("refuse le champ %s trop long sans rien modifier", async (champ, message) => {
+        const contact = await contactA("demo");
+
+        await expect(
+          service.modifier(contact.id, { ...fiche, [champ]: texteDe(201) }),
+        ).resolves.toEqual({ ok: false, erreurs: { [champ]: message } });
+        await expect(repository.trouver(contact.id)).resolves.toEqual(contact);
+      });
+
+      it("refuse un e-mail trop long, même bien formé", async () => {
+        const contact = await contactA("demo");
+
+        await expect(
+          service.modifier(contact.id, { ...fiche, email: `${texteDe(190)}@example.com` }),
+        ).resolves.toEqual({
+          ok: false,
+          erreurs: { email: "L'e-mail ne doit pas dépasser 200 caractères." },
+        });
+      });
+
+      it.each(["nom", "entreprise", "fonction", "email", "telephone"] as const)(
+        "refuse le champ %s qui n'est pas un texte sans rien modifier",
+        async (champ) => {
+          const contact = await contactA("demo");
+
+          await expect(
+            service.modifier(contact.id, { ...fiche, [champ]: brut<string>({ texte: "x" }) }),
+          ).resolves.toEqual({ ok: false, erreurs: { [champ]: PAS_UN_TEXTE } });
+          await expect(repository.trouver(contact.id)).resolves.toEqual(contact);
+        },
+      );
+
+      it("traite une saisie qui n'est pas un objet comme une saisie vide", async () => {
+        const contact = await contactA("demo");
+
+        await expect(service.modifier(contact.id, brut<SaisieFiche>("Claire"))).resolves.toEqual({
+          ok: false,
+          erreurs: { nom: "Indiquez le nom du contact." },
+        });
+        await expect(repository.trouver(contact.id)).resolves.toEqual(contact);
+      });
+    });
+
+    describe("marquerRelance", () => {
+      async function contactDuJour() {
+        const contact = await contactA("demo");
+        await repository.changerRelance(contact.id, "2026-11-18");
+        return contact;
+      }
+
+      it("accepte une note de 2 000 caractères", async () => {
+        const contact = await contactDuJour();
+
+        await expect(
+          service.marquerRelance(contact.id, { note: texteDe(2000) }),
+        ).resolves.toMatchObject({ ok: true });
+      });
+
+      it("refuse une note de plus de 2 000 caractères sans rien enregistrer", async () => {
+        const contact = await contactDuJour();
+
+        await expect(
+          service.marquerRelance(contact.id, { note: texteDe(2001) }),
+        ).resolves.toEqual({
+          ok: false,
+          erreurs: { note: "La note ne doit pas dépasser 2 000 caractères." },
+        });
+        await expect(repository.trouver(contact.id)).resolves.toMatchObject({
+          dernierEchangeLe: null,
+          note: null,
+          relanceLe: "2026-11-18",
+        });
+      });
+
+      it("refuse une note qui n'est pas un texte", async () => {
+        const contact = await contactDuJour();
+
+        await expect(
+          service.marquerRelance(contact.id, { note: brut<string>(42) }),
+        ).resolves.toEqual({ ok: false, erreurs: { note: PAS_UN_TEXTE } });
+      });
+
+      it.each([20261202, { date: "2026-12-02" }])(
+        "refuse la relance suivante %j, qui n'est pas un texte",
+        async (prochaineRelance) => {
+          const contact = await contactDuJour();
+
+          await expect(
+            service.marquerRelance(contact.id, { prochaineRelance: brut<string>(prochaineRelance) }),
+          ).resolves.toEqual({
+            ok: false,
+            erreurs: { prochaineRelance: "Indiquez une date de relance." },
+          });
+        },
+      );
+
+      it("traite une saisie qui n'est pas un objet comme un marquage sans note ni relance", async () => {
+        const contact = await contactDuJour();
+
+        const resultat = await service.marquerRelance(contact.id, brut<SaisieEchange>(42));
+
+        expect(resultat.ok).toBe(true);
+        await expect(repository.trouver(contact.id)).resolves.toMatchObject({
+          dernierEchangeLe: "2026-11-18",
+          relanceLe: null,
+        });
+      });
+    });
+
+    it.each([20261124, null, { date: "2026-11-24" }])(
+      "refuse la date de relance %j, qui n'est pas un texte",
+      async (date) => {
+        const contact = await contactA("demo");
+
+        await expect(service.planifierRelance(contact.id, brut<string>(date))).resolves.toEqual({
+          ok: false,
+          erreur: "Indiquez une date de relance.",
+        });
+      },
+    );
+
+    it.each([2, null, ["demo"]])("refuse l'étape %j, qui n'est pas un texte", async (etape) => {
+      const contact = await contactA("proposition");
+
+      await expect(service.changerEtape(contact.id, brut<string>(etape))).resolves.toEqual({
+        ok: false,
+        erreur: "Cette étape n'existe pas.",
       });
     });
   });
