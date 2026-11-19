@@ -48,7 +48,7 @@ Statut : livré
 
 ## Lot 4 : Voir qui relancer aujourd'hui
 
-Statut : à faire
+Statut : livré
 
 **Parcours.** L'accueil s'ouvre sur « À relancer aujourd'hui » : les contacts dont la relance tombe aujourd'hui ou est en retard, les plus en retard en premier. La liste de tous les contacts vient en dessous.
 

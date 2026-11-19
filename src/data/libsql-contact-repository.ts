@@ -11,6 +11,8 @@ const SQL = {
   trouver: `SELECT ${COLONNES} FROM contacts WHERE id = ?`,
   changerEtape: `UPDATE contacts SET etape = ? WHERE id = ? RETURNING ${COLONNES}`,
   changerRelance: `UPDATE contacts SET relance_le = ? WHERE id = ? RETURNING ${COLONNES}`,
+  // Les dates AAAA-MM-JJ se comparent comme des chaînes.
+  listerRelancesJusquAu: `SELECT ${COLONNES} FROM contacts WHERE relance_le IS NOT NULL AND relance_le <= ?`,
 };
 
 function texteOuNull(valeur: Ligne[string]): string | null {
@@ -65,6 +67,11 @@ export function createLibsqlContactRepository(db: Db): ContactRepository {
 
     changerRelance(id, date) {
       return unContact(SQL.changerRelance, [date, id]);
+    },
+
+    async listerRelancesJusquAu(date) {
+      const resultat = await db.execute({ sql: SQL.listerRelancesJusquAu, args: [date] });
+      return resultat.rows.map(versContact);
     },
   };
 }

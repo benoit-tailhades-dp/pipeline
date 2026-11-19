@@ -136,6 +136,31 @@ describe("LibsqlContactRepository", () => {
       await expect(repository.changerRelance(42, "2026-11-24")).resolves.toBeNull();
     });
   });
+
+  describe("listerRelancesJusquAu", () => {
+    async function avecRelance(nom: string, relanceLe: string | null) {
+      const ajoute = await repository.ajouter({ ...claire, nom });
+      return relanceLe ? repository.changerRelance(ajoute.id, relanceLe) : ajoute;
+    }
+
+    it("renvoie les contacts dont la relance tombe à la date donnée ou avant", async () => {
+      const enRetard = await avecRelance("Marc Delorme", "2026-11-15");
+      const duJour = await avecRelance("Claire Vasseur", "2026-11-18");
+      await avecRelance("Inès Garnier", "2026-11-19");
+      await avecRelance("Paul Roussel", null);
+
+      const relances = await repository.listerRelancesJusquAu("2026-11-18");
+
+      expect(relances).toHaveLength(2);
+      expect(relances).toEqual(expect.arrayContaining([enRetard, duJour]));
+    });
+
+    it("renvoie une liste vide quand aucune relance n'est due", async () => {
+      await avecRelance("Inès Garnier", "2026-11-19");
+
+      await expect(repository.listerRelancesJusquAu("2026-11-18")).resolves.toEqual([]);
+    });
+  });
 });
 
 describe("LibsqlContactRepository sur un fichier", () => {

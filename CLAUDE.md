@@ -23,6 +23,8 @@ Lot 2 livré : étapes du pipeline. Le service porte l'ordre des étapes et leur
 
 Lot 3 livré : relance planifiée sur la carte (`RelanceContact`). Les dates du calendrier sont des chaînes `AAAA-MM-JJ` (`DateCalendrier`), comparables telles quelles. « Aujourd'hui » se calcule dans le service avec `dateDuJour(now(), fuseau)` (`src/services/dates.ts`, fuseau `Europe/Paris` par défaut). La présentation formate avec `src/components/contacts/dates.ts`. Les Server Actions de la carte passent dans une seule prop `actions` (`ActionsContact`). Les requêtes SQL du repository sont des constantes en tête de fichier.
 
+Lot 4 livré : section « À relancer aujourd’hui » en tête de l'accueil (`ListeARelancer`). Le repository renvoie les relances dues jusqu'à une date (`listerRelancesJusquAu`), le service fixe cette date à aujourd'hui, calcule le `retard` en jours (`joursEntre`) et trie du plus en retard au plus récent. Dans le JSX, l'apostrophe est typographique (’) : ESLint refuse l'apostrophe droite (`react/no-unescaped-entities`).
+
 Le découpage en lots, avec les critères d'acceptation et le statut de chaque lot, est dans `LOTS.md`.
 
 ## Organisation des couches

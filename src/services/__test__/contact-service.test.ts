@@ -33,6 +33,11 @@ function fauxRepository(): ContactRepository {
       contact.relanceLe = date;
       return { ...contact };
     },
+    async listerRelancesJusquAu(date) {
+      return contacts
+        .filter((c) => c.relanceLe !== null && c.relanceLe <= date)
+        .map((contact) => ({ ...contact }));
+    },
   };
 }
 
@@ -355,6 +360,75 @@ describe("ContactService", () => {
         ok: false,
         erreur: "Ce contact n'existe plus.",
       });
+    });
+  });
+
+  describe("aRelancer", () => {
+    // `maintenant` : le 18 novembre 2026 à 10 h, heure de Paris.
+
+    async function relanceLe(nom: string, date: string | null) {
+      const contact = await repository.ajouter({
+        nom,
+        entreprise: null,
+        etape: "demo",
+        creeLe: maintenant,
+      });
+      return date ? (await repository.changerRelance(contact.id, date))! : contact;
+    }
+
+    it("contient un contact dont la relance tombe aujourd'hui, sans retard", async () => {
+      await relanceLe("Claire Vasseur", "2026-11-18");
+
+      await expect(service.aRelancer()).resolves.toEqual([
+        expect.objectContaining({
+          nom: "Claire Vasseur",
+          relanceLe: "2026-11-18",
+          retard: 0,
+          temperature: "tiede",
+        }),
+      ]);
+    });
+
+    it("place un contact en retard de 3 jours avant ceux du jour", async () => {
+      await relanceLe("Claire Vasseur", "2026-11-18");
+      await relanceLe("Marc Delorme", "2026-11-15");
+
+      const relances = await service.aRelancer();
+
+      expect(relances.map(({ nom, retard }) => ({ nom, retard }))).toEqual([
+        { nom: "Marc Delorme", retard: 3 },
+        { nom: "Claire Vasseur", retard: 0 },
+      ]);
+    });
+
+    it("classe les retards du plus ancien au plus récent", async () => {
+      await relanceLe("Claire Vasseur", "2026-11-17");
+      await relanceLe("Marc Delorme", "2026-11-08");
+      await relanceLe("Inès Garnier", "2026-11-14");
+
+      const noms = (await service.aRelancer()).map((contact) => contact.nom);
+
+      expect(noms).toEqual(["Marc Delorme", "Inès Garnier", "Claire Vasseur"]);
+    });
+
+    it("ne contient pas un contact dont la relance tombe demain", async () => {
+      await relanceLe("Claire Vasseur", "2026-11-19");
+
+      await expect(service.aRelancer()).resolves.toEqual([]);
+    });
+
+    it("ne contient pas un contact sans relance", async () => {
+      await relanceLe("Claire Vasseur", null);
+
+      await expect(service.aRelancer()).resolves.toEqual([]);
+    });
+
+    it("compte « aujourd'hui » à l'heure de Paris", async () => {
+      // 23 h 30 UTC le 18 : il est déjà 0 h 30 le 19 à Paris.
+      maintenant = new Date("2026-11-18T23:30:00.000Z");
+      await relanceLe("Claire Vasseur", "2026-11-19");
+
+      await expect(service.aRelancer()).resolves.toMatchObject([{ retard: 0 }]);
     });
   });
 });

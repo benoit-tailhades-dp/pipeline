@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { dateDuJour, estUneDate } from "../dates";
+import { dateDuJour, estUneDate, joursEntre } from "../dates";
 
 describe("dateDuJour", () => {
   it("donne la date du calendrier dans le fuseau", () => {
@@ -24,4 +24,17 @@ describe("estUneDate", () => {
       expect(estUneDate(valeur)).toBe(false);
     },
   );
+});
+
+describe("joursEntre", () => {
+  it.each([
+    ["2026-11-18", "2026-11-18", 0],
+    ["2026-11-15", "2026-11-18", 3],
+    ["2026-11-19", "2026-11-18", -1],
+    ["2026-10-30", "2026-11-02", 3],
+    // Passage à l'heure d'hiver le 25 octobre : un jour reste un jour.
+    ["2026-10-24", "2026-10-26", 2],
+  ])("compte de %s à %s : %i", (de, a, attendu) => {
+    expect(joursEntre(de, a)).toBe(attendu);
+  });
 });

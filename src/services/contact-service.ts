@@ -1,6 +1,6 @@
 import type { Contact, ContactRepository, Etape } from "@/data/contact-repository";
 
-import { dateDuJour, estUneDate } from "./dates";
+import { dateDuJour, estUneDate, joursEntre } from "./dates";
 
 export type { Contact, Etape };
 
@@ -19,6 +19,12 @@ export interface ContactSuivi extends Contact {
   position: number;
   /** L'étape où « Étape suivante » mène, `null` à la dernière. */
   suivante: Etape | null;
+}
+
+/** Un contact de « À relancer aujourd'hui ». */
+export interface ContactARelancer extends ContactSuivi {
+  /** Jours écoulés depuis la date de relance : 0 si elle tombe aujourd'hui. */
+  retard: number;
 }
 
 export interface SaisieContact {
@@ -144,6 +150,18 @@ export function createContactService({
 
     async retirerRelance(id: number): Promise<ResultatContact> {
       return resultat(await contacts.changerRelance(id, null));
+    },
+
+    /** Les relances dues aujourd'hui ou en retard, les plus en retard en premier. */
+    async aRelancer(): Promise<ContactARelancer[]> {
+      const jour = aujourdhui();
+      const dues = await contacts.listerRelancesJusquAu(jour);
+      return dues
+        .map((contact) => ({
+          ...suivre(contact),
+          retard: joursEntre(contact.relanceLe ?? jour, jour),
+        }))
+        .toSorted((a, b) => b.retard - a.retard);
     },
   };
 }

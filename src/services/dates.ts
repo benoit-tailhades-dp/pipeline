@@ -22,3 +22,10 @@ export function estUneDate(valeur: string): boolean {
   const date = new Date(`${valeur}T00:00:00.000Z`);
   return !Number.isNaN(date.getTime()) && date.toISOString().startsWith(valeur);
 }
+
+const MS_PAR_JOUR = 24 * 60 * 60 * 1000;
+
+/** Nombre de jours de `de` à `a`, négatif si `a` tombe avant. Calculé en UTC : pas d'heure d'été. */
+export function joursEntre(de: string, a: string): number {
+  return Math.round((Date.parse(`${a}T00:00:00.000Z`) - Date.parse(`${de}T00:00:00.000Z`)) / MS_PAR_JOUR);
+}

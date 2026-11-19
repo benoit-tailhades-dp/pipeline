@@ -1,4 +1,8 @@
-import type { ContactSuivi, EtapeDuParcours } from "@/services/contact-service";
+import type {
+  ContactARelancer,
+  ContactSuivi,
+  EtapeDuParcours,
+} from "@/services/contact-service";
 
 import type { ActionsContact } from "../carte-contact";
 
@@ -25,6 +29,11 @@ export function contactSuivi(champs: Partial<ContactSuivi> = {}): ContactSuivi {
     relanceLe: null,
     ...champs,
   };
+}
+
+/** Contact de « À relancer aujourd'hui » : par défaut, relance due aujourd'hui (18 novembre). */
+export function contactARelancer(champs: Partial<ContactARelancer> = {}): ContactARelancer {
+  return { ...contactSuivi({ relanceLe: "2026-11-18" }), retard: 0, ...champs };
 }
 
 export const actionsInertes: ActionsContact = {

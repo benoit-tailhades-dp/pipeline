@@ -36,4 +36,6 @@ export interface ContactRepository {
   changerEtape(id: number, etape: Etape): Promise<Contact | null>;
   /** Enregistre la date de relance (`null` la retire), ou `null` si le contact n'existe pas. */
   changerRelance(id: number, date: DateCalendrier | null): Promise<Contact | null>;
+  /** Les contacts dont la relance tombe à cette date ou avant, sans ordre garanti. */
+  listerRelancesJusquAu(date: DateCalendrier): Promise<Contact[]>;
 }
