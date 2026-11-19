@@ -19,6 +19,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Lot 1 livré : ajout et liste des contacts sur l'accueil (`contact-repository`, `contact-service`, `src/components/contacts/`, Server Action dans `src/app/actions.ts`). Le schéma est dans `src/data/schema.ts`, appliqué par le container à la première ouverture de la base.
 
+Lot 2 livré : étapes du pipeline. Le service porte l'ordre des étapes et leur température (`etapes()`, `avancer`, `changerEtape`) et renvoie des `ContactSuivi` (température, position, étape suivante). La carte est `src/components/contacts/carte-contact.tsx` : elle reçoit ses Server Actions en props pour rester testable. Une colonne ajoutée à une table existante passe par `ajouterColonneAbsente` dans `schema.ts`, pour migrer les bases déjà créées.
+
 Le découpage en lots, avec les critères d'acceptation et le statut de chaque lot, est dans `LOTS.md`.
 
 ## Organisation des couches

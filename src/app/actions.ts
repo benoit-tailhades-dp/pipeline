@@ -21,3 +21,15 @@ export async function ajouterContact(
   refresh();
   return {};
 }
+
+// Un refus du service (contact supprimé, étape inconnue) ne se produit pas depuis l'écran :
+// le rafraîchissement réaffiche l'état réel de la carte.
+export async function avancerEtape(id: number): Promise<void> {
+  await (await contactService()).avancer(id);
+  refresh();
+}
+
+export async function changerEtape(id: number, etape: string): Promise<void> {
+  await (await contactService()).changerEtape(id, etape);
+  refresh();
+}

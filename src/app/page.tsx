@@ -1,7 +1,7 @@
 import { connection } from "next/server";
 import { Suspense } from "react";
 
-import { ajouterContact } from "@/app/actions";
+import { ajouterContact, avancerEtape, changerEtape } from "@/app/actions";
 import { FormulaireContact } from "@/components/contacts/formulaire-contact";
 import { ListeContacts } from "@/components/contacts/liste-contacts";
 import { contactService } from "@/server/container";
@@ -9,8 +9,16 @@ import { contactService } from "@/server/container";
 async function ContactsCourants() {
   // libSQL en mode fichier est synchrone : sans connection(), Next figerait la liste au build.
   await connection();
-  const contacts = await (await contactService()).lister();
-  return <ListeContacts contacts={contacts} />;
+  const service = await contactService();
+  const contacts = await service.lister();
+  return (
+    <ListeContacts
+      contacts={contacts}
+      etapes={service.etapes()}
+      avancerAction={avancerEtape}
+      changerEtapeAction={changerEtape}
+    />
+  );
 }
 
 export default function Home() {
