@@ -1,8 +1,14 @@
 import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { ListeARelancer } from "../liste-a-relancer";
+import type { ContactARelancer } from "@/services/contact-service";
+
+import { ListeARelancer as Liste } from "../liste-a-relancer";
 import { contactARelancer } from "./fixtures";
+
+function ListeARelancer({ contacts }: { contacts: ContactARelancer[] }) {
+  return <Liste contacts={contacts} marquerAction={async () => ({})} />;
+}
 
 describe("ListeARelancer", () => {
   it("affiche un contact dont la relance tombe aujourd'hui", () => {
@@ -52,5 +58,11 @@ describe("ListeARelancer", () => {
 
     screen.getByText("Personne à relancer aujourd’hui.");
     expect(screen.queryAllByRole("listitem")).toHaveLength(0);
+  });
+
+  it("propose de marquer chaque contact comme relancé", () => {
+    render(<ListeARelancer contacts={[contactARelancer()]} />);
+
+    within(screen.getByRole("listitem")).getByRole("button", { name: "Marquer comme relancé" });
   });
 });

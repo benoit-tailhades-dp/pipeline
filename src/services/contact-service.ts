@@ -19,12 +19,20 @@ export interface ContactSuivi extends Contact {
   position: number;
   /** L'étape où « Étape suivante » mène, `null` à la dernière. */
   suivante: Etape | null;
+  /** Jours écoulés depuis le dernier échange : 0 s'il a eu lieu aujourd'hui. */
+  joursDepuisDernierEchange: number | null;
 }
 
 /** Un contact de « À relancer aujourd'hui ». */
 export interface ContactARelancer extends ContactSuivi {
   /** Jours écoulés depuis la date de relance : 0 si elle tombe aujourd'hui. */
   retard: number;
+}
+
+export interface SaisieEchange {
+  note?: string;
+  /** Date AAAA-MM-JJ de la relance suivante, vide pour n'en planifier aucune. */
+  prochaineRelance?: string;
 }
 
 export interface SaisieContact {
@@ -61,13 +69,16 @@ function estUneEtape(valeur: string): valeur is Etape {
   return ETAPES.some((e) => e.code === valeur);
 }
 
-function suivre(contact: Contact): ContactSuivi {
+/** Ce que la carte affiche du contact, vu depuis le jour `jour`. */
+function suivre(contact: Contact, jour: string): ContactSuivi {
   const rang = rangDe(contact.etape);
   return {
     ...contact,
     temperature: ETAPES[rang].temperature,
     position: rang + 1,
     suivante: ETAPES[rang + 1]?.code ?? null,
+    joursDepuisDernierEchange:
+      contact.dernierEchangeLe === null ? null : joursEntre(contact.dernierEchangeLe, jour),
   };
 }
 
@@ -90,7 +101,7 @@ export function createContactService({
   }
 
   function resultat(contact: Contact | null): ResultatContact {
-    return contact ? { ok: true, contact: suivre(contact) } : CONTACT_INCONNU;
+    return contact ? { ok: true, contact: suivre(contact, aujourdhui()) } : CONTACT_INCONNU;
   }
 
   async function enregistrerEtape(id: number, etape: Etape): Promise<ResultatContact> {
@@ -116,7 +127,10 @@ export function createContactService({
     /** Du plus récent au plus ancien. */
     async lister(): Promise<ContactSuivi[]> {
       const tous = await contacts.lister();
-      return tous.toSorted((a, b) => b.creeLe.getTime() - a.creeLe.getTime()).map(suivre);
+      const jour = aujourdhui();
+      return tous
+        .toSorted((a, b) => b.creeLe.getTime() - a.creeLe.getTime())
+        .map((contact) => suivre(contact, jour));
     },
 
     /** Les étapes dans l'ordre, pour la liste des étapes et la piste. */
@@ -128,7 +142,7 @@ export function createContactService({
     async avancer(id: number): Promise<ResultatContact> {
       const contact = await contacts.trouver(id);
       if (!contact) return CONTACT_INCONNU;
-      const { suivante } = suivre(contact);
+      const { suivante } = suivre(contact, aujourdhui());
       if (!suivante) return { ok: false, erreur: "Ce contact est déjà à la dernière étape." };
       return enregistrerEtape(id, suivante);
     },
@@ -152,13 +166,40 @@ export function createContactService({
       return resultat(await contacts.changerRelance(id, null));
     },
 
+    /**
+     * Enregistre l'échange du jour. Sans note, la note précédente est gardée.
+     * Sans relance suivante, aucune relance n'est planifiée.
+     */
+    async marquerRelance(id: number, saisie: SaisieEchange): Promise<ResultatContact> {
+      const jour = aujourdhui();
+      const prochaineRelance = saisie.prochaineRelance?.trim() || null;
+      if (prochaineRelance !== null) {
+        if (!estUneDate(prochaineRelance)) {
+          return { ok: false, erreur: "Indiquez une date de relance." };
+        }
+        // Une relance aujourd'hui garderait le contact dans la liste du jour.
+        if (prochaineRelance <= jour) {
+          return { ok: false, erreur: "La relance suivante doit tomber après aujourd'hui." };
+        }
+      }
+      const contact = await contacts.trouver(id);
+      if (!contact) return CONTACT_INCONNU;
+      return resultat(
+        await contacts.enregistrerEchange(id, {
+          dernierEchangeLe: jour,
+          note: saisie.note?.trim() || contact.note,
+          relanceLe: prochaineRelance,
+        }),
+      );
+    },
+
     /** Les relances dues aujourd'hui ou en retard, les plus en retard en premier. */
     async aRelancer(): Promise<ContactARelancer[]> {
       const jour = aujourdhui();
       const dues = await contacts.listerRelancesJusquAu(jour);
       return dues
         .map((contact) => ({
-          ...suivre(contact),
+          ...suivre(contact, jour),
           retard: joursEntre(contact.relanceLe ?? jour, jour),
         }))
         .toSorted((a, b) => b.retard - a.retard);

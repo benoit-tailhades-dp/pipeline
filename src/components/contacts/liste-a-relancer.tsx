@@ -1,12 +1,27 @@
 import { Badge } from "@/components/ui/badge";
-import { Card, CardAction, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import type { ContactARelancer } from "@/services/contact-service";
+
+import { MarquerRelance, type EtatMarquage, type SaisieMarquage } from "./marquer-relance";
 
 function retardEnClair(retard: number): string {
   return retard === 1 ? "En retard de 1 jour" : `En retard de ${retard} jours`;
 }
 
-export function ListeARelancer({ contacts }: { contacts: ContactARelancer[] }) {
+export function ListeARelancer({
+  contacts,
+  marquerAction,
+}: {
+  contacts: ContactARelancer[];
+  marquerAction: (id: number, saisie: SaisieMarquage) => Promise<EtatMarquage>;
+}) {
   if (contacts.length === 0) {
     return <p className="text-sm text-muted-foreground">Personne à relancer aujourd’hui.</p>;
   }
@@ -33,6 +48,9 @@ export function ListeARelancer({ contacts }: { contacts: ContactARelancer[] }) {
                 )}
               </CardAction>
             </CardHeader>
+            <CardContent>
+              <MarquerRelance id={contact.id} marquerAction={marquerAction} />
+            </CardContent>
           </Card>
         </li>
       ))}

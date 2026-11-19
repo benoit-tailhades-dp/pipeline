@@ -130,4 +130,33 @@ describe("CarteContact", () => {
 
     screen.getByText("Relance le 24 nov.");
   });
+
+  it("affiche « Dernier échange : aujourd’hui » pour un échange du jour", () => {
+    afficher(contactSuivi({ dernierEchangeLe: "2026-11-18", joursDepuisDernierEchange: 0 }));
+
+    screen.getByText("Dernier échange : aujourd’hui");
+  });
+
+  it("affiche « hier », puis la date, pour un échange plus ancien", () => {
+    const { unmount } = afficher(
+      contactSuivi({ dernierEchangeLe: "2026-11-17", joursDepuisDernierEchange: 1 }),
+    );
+    screen.getByText("Dernier échange : hier");
+    unmount();
+
+    afficher(contactSuivi({ dernierEchangeLe: "2026-11-04", joursDepuisDernierEchange: 14 }));
+    screen.getByText("Dernier échange : le 4 nov.");
+  });
+
+  it("n'affiche pas de dernier échange quand il n'y en a pas eu", () => {
+    afficher(contactSuivi());
+
+    expect(screen.queryByText(/Dernier échange/)).toBeNull();
+  });
+
+  it("affiche la note du dernier échange", () => {
+    afficher(contactSuivi({ note: "Rappeler après l'audit de juin" }));
+
+    screen.getByText("Rappeler après l'audit de juin");
+  });
 });

@@ -15,7 +15,17 @@ export interface Contact {
   entreprise: string | null;
   etape: Etape;
   relanceLe: DateCalendrier | null;
+  dernierEchangeLe: DateCalendrier | null;
+  /** Note sur le dernier échange. */
+  note: string | null;
   creeLe: Date;
+}
+
+/** Ce qu'on enregistre quand on marque un contact comme relancé. */
+export interface Echange {
+  dernierEchangeLe: DateCalendrier;
+  note: string | null;
+  relanceLe: DateCalendrier | null;
 }
 
 export interface NouveauContact {
@@ -36,6 +46,8 @@ export interface ContactRepository {
   changerEtape(id: number, etape: Etape): Promise<Contact | null>;
   /** Enregistre la date de relance (`null` la retire), ou `null` si le contact n'existe pas. */
   changerRelance(id: number, date: DateCalendrier | null): Promise<Contact | null>;
+  /** Enregistre l'échange tel quel, ou renvoie `null` si le contact n'existe pas. */
+  enregistrerEchange(id: number, echange: Echange): Promise<Contact | null>;
   /** Les contacts dont la relance tombe à cette date ou avant, sans ordre garanti. */
   listerRelancesJusquAu(date: DateCalendrier): Promise<Contact[]>;
 }

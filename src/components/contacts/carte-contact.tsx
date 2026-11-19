@@ -28,6 +28,7 @@ import type {
   Temperature,
 } from "@/services/contact-service";
 
+import { formaterDateCourte } from "./dates";
 import { RelanceContact, type EtatRelance } from "./relance-contact";
 
 const LIBELLES_ETAPES: Record<Etape, string> = {
@@ -55,6 +56,12 @@ const COULEURS_PISTE: Record<Temperature, string> = {
   chaud: "bg-chaud",
   signe: "bg-primary",
 };
+
+function dernierEchangeEnClair(jours: number, date: string): string {
+  if (jours === 0) return "aujourd’hui";
+  if (jours === 1) return "hier";
+  return `le ${formaterDateCourte(date)}`;
+}
 
 function Pastille({ temperature }: { temperature: Temperature }) {
   const { libelle, variante, point } = PASTILLES[temperature];
@@ -173,6 +180,13 @@ export function CarteContact({
             </Button>
           )}
         </div>
+        {contact.note && <p className="text-base">{contact.note}</p>}
+        {contact.dernierEchangeLe !== null && contact.joursDepuisDernierEchange !== null && (
+          <p className="text-muted-foreground">
+            Dernier échange :{" "}
+            {dernierEchangeEnClair(contact.joursDepuisDernierEchange, contact.dernierEchangeLe)}
+          </p>
+        )}
         <RelanceContact
           contact={contact}
           planifierAction={actions.planifierRelance}

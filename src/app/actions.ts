@@ -3,6 +3,7 @@
 import { refresh } from "next/cache";
 
 import type { EtatFormulaireContact } from "@/components/contacts/formulaire-contact";
+import type { EtatMarquage, SaisieMarquage } from "@/components/contacts/marquer-relance";
 import type { EtatRelance } from "@/components/contacts/relance-contact";
 import { contactService } from "@/server/container";
 
@@ -45,4 +46,11 @@ export async function planifierRelance(id: number, date: string): Promise<EtatRe
 export async function retirerRelance(id: number): Promise<void> {
   await (await contactService()).retirerRelance(id);
   refresh();
+}
+
+export async function marquerRelance(id: number, saisie: SaisieMarquage): Promise<EtatMarquage> {
+  const resultat = await (await contactService()).marquerRelance(id, saisie);
+  if (!resultat.ok) return { erreur: resultat.erreur, valeurs: saisie };
+  refresh();
+  return {};
 }

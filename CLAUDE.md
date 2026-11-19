@@ -25,6 +25,8 @@ Lot 3 livré : relance planifiée sur la carte (`RelanceContact`). Les dates du 
 
 Lot 4 livré : section « À relancer aujourd’hui » en tête de l'accueil (`ListeARelancer`). Le repository renvoie les relances dues jusqu'à une date (`listerRelancesJusquAu`), le service fixe cette date à aujourd'hui, calcule le `retard` en jours (`joursEntre`) et trie du plus en retard au plus récent. Dans le JSX, l'apostrophe est typographique (’) : ESLint refuse l'apostrophe droite (`react/no-unescaped-entities`).
 
+Lot 5 livré : « Marquer comme relancé » dans « À relancer aujourd’hui » (`MarquerRelance`). Le service enregistre l'échange du jour (`marquerRelance` puis `enregistrerEchange` dans le repository). Sans note saisie, la note précédente est gardée. Sans relance suivante, aucune relance n'est planifiée. Une relance suivante doit tomber après aujourd'hui. La carte affiche la note et « Dernier échange : … » à partir de `joursDepuisDernierEchange`.
+
 Le découpage en lots, avec les critères d'acceptation et le statut de chaque lot, est dans `LOTS.md`.
 
 ## Organisation des couches

@@ -60,7 +60,7 @@ Statut : livré
 
 ## Lot 5 : Marquer un contact comme relancé
 
-Statut : à faire
+Statut : livré
 
 **Parcours.** Depuis « À relancer aujourd'hui », je marque un contact comme relancé. Je peux ajouter une note sur l'échange et planifier la relance suivante. Le contact sort alors de la liste du jour.
 

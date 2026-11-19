@@ -27,6 +27,9 @@ export function contactSuivi(champs: Partial<ContactSuivi> = {}): ContactSuivi {
     position: 1,
     suivante: "premier-echange",
     relanceLe: null,
+    dernierEchangeLe: null,
+    note: null,
+    joursDepuisDernierEchange: null,
     ...champs,
   };
 }

@@ -5,6 +5,7 @@ import {
   ajouterContact,
   avancerEtape,
   changerEtape,
+  marquerRelance,
   planifierRelance,
   retirerRelance,
 } from "@/app/actions";
@@ -24,7 +25,7 @@ const actionsContact: ActionsContact = {
 async function RelancesDuJour() {
   await connection();
   const relances = await (await contactService()).aRelancer();
-  return <ListeARelancer contacts={relances} />;
+  return <ListeARelancer contacts={relances} marquerAction={marquerRelance} />;
 }
 
 async function ContactsCourants() {

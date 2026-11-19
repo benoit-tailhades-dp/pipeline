@@ -17,7 +17,7 @@ const claire = {
 };
 
 /** Champs que l'ajout laisse vides. */
-const vides = { relanceLe: null };
+const vides = { relanceLe: null, dernierEchangeLe: null, note: null };
 
 describe("LibsqlContactRepository", () => {
   let db: Db;
@@ -137,6 +137,63 @@ describe("LibsqlContactRepository", () => {
     });
   });
 
+  describe("enregistrerEchange", () => {
+    it("enregistre la date de l'échange, la note et la relance suivante", async () => {
+      const ajoute = await repository.ajouter(claire);
+      await repository.changerRelance(ajoute.id, "2026-11-18");
+
+      const modifie = await repository.enregistrerEchange(ajoute.id, {
+        dernierEchangeLe: "2026-11-18",
+        note: "Rappeler après l'audit de juin",
+        relanceLe: "2026-12-02",
+      });
+
+      expect(modifie).toEqual({
+        ...ajoute,
+        dernierEchangeLe: "2026-11-18",
+        note: "Rappeler après l'audit de juin",
+        relanceLe: "2026-12-02",
+      });
+      await expect(repository.trouver(ajoute.id)).resolves.toEqual(modifie);
+    });
+
+    it("enregistre une note et une relance absentes", async () => {
+      const ajoute = await repository.ajouter(claire);
+      await repository.changerRelance(ajoute.id, "2026-11-18");
+
+      await repository.enregistrerEchange(ajoute.id, {
+        dernierEchangeLe: "2026-11-18",
+        note: null,
+        relanceLe: null,
+      });
+
+      await expect(repository.trouver(ajoute.id)).resolves.toMatchObject({
+        dernierEchangeLe: "2026-11-18",
+        note: null,
+        relanceLe: null,
+      });
+    });
+
+    it("ne touche pas aux autres contacts", async () => {
+      const marc = await repository.ajouter({ ...claire, nom: "Marc Delorme" });
+      const ajoute = await repository.ajouter(claire);
+
+      await repository.enregistrerEchange(ajoute.id, {
+        dernierEchangeLe: "2026-11-18",
+        note: "Note",
+        relanceLe: null,
+      });
+
+      await expect(repository.trouver(marc.id)).resolves.toEqual(marc);
+    });
+
+    it("renvoie null pour un contact inconnu", async () => {
+      await expect(
+        repository.enregistrerEchange(42, { dernierEchangeLe: "2026-11-18", note: null, relanceLe: null }),
+      ).resolves.toBeNull();
+    });
+  });
+
   describe("listerRelancesJusquAu", () => {
     async function avecRelance(nom: string, relanceLe: string | null) {
       const ajoute = await repository.ajouter({ ...claire, nom });
@@ -220,6 +277,27 @@ describe("LibsqlContactRepository sur un fichier", () => {
     await expect(
       apresRedemarrage((repository) => repository.trouver(ajoute.id)),
     ).resolves.toMatchObject({ relanceLe: "2026-11-24" });
+  });
+
+  it("conserve le dernier échange et la note après un redémarrage", async () => {
+    const avant = createDb(url);
+    await appliquerSchema(avant);
+    const repository = createLibsqlContactRepository(avant);
+    const ajoute = await repository.ajouter(claire);
+    await repository.enregistrerEchange(ajoute.id, {
+      dernierEchangeLe: "2026-11-18",
+      note: "Rappeler après l'audit de juin",
+      relanceLe: "2026-12-02",
+    });
+    avant.close();
+
+    await expect(
+      apresRedemarrage((repository) => repository.trouver(ajoute.id)),
+    ).resolves.toMatchObject({
+      dernierEchangeLe: "2026-11-18",
+      note: "Rappeler après l'audit de juin",
+      relanceLe: "2026-12-02",
+    });
   });
 
   it("place à « À contacter » les contacts d'une base créée avant les étapes", async () => {
