@@ -23,7 +23,7 @@ Statut : livré
 
 ## Lot 2 : Faire avancer un contact d'étape
 
-Statut : à faire
+Statut : livré
 
 **Parcours.** Tout nouveau contact commence à « À contacter ». Depuis sa carte, je le fais passer à l'étape suivante, ou je corrige son étape dans la liste des étapes. La carte affiche l'étape, sa température (froid, tiède, chaud, signé) et la piste de progression.
 
