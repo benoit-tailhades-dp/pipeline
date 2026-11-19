@@ -21,6 +21,9 @@ export function contactSuivi(champs: Partial<ContactSuivi> = {}): ContactSuivi {
     id: 7,
     nom: "Claire Vasseur",
     entreprise: "Ateliers Vernier",
+    fonction: null,
+    email: null,
+    telephone: null,
     creeLe: new Date("2026-11-18T09:00:00.000Z"),
     etape: "a-contacter",
     temperature: "froid",
@@ -44,4 +47,6 @@ export const actionsInertes: ActionsContact = {
   changerEtape: async () => {},
   planifierRelance: async () => ({}),
   retirerRelance: async () => {},
+  modifier: async () => ({}),
+  supprimer: async () => {},
 };

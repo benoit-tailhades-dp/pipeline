@@ -159,4 +159,65 @@ describe("CarteContact", () => {
 
     screen.getByText("Rappeler après l'audit de juin");
   });
+
+  it("affiche la fonction, l'e-mail et le téléphone", () => {
+    afficher(
+      contactSuivi({
+        fonction: "Responsable PLM",
+        email: "claire.vasseur@vernier.fr",
+        telephone: "06 12 34 56 78",
+      }),
+    );
+
+    screen.getByText("Responsable PLM, Ateliers Vernier");
+    screen.getByText("claire.vasseur@vernier.fr");
+    screen.getByText("06 12 34 56 78");
+  });
+
+  it("ouvre la fiche pré-remplie quand je clique sur « Modifier »", () => {
+    afficher(contactSuivi());
+
+    fireEvent.click(screen.getByRole("button", { name: "Modifier" }));
+
+    expect((screen.getByLabelText("Nom") as HTMLInputElement).value).toBe("Claire Vasseur");
+    expect((screen.getByLabelText(/Entreprise/) as HTMLInputElement).value).toBe(
+      "Ateliers Vernier",
+    );
+  });
+
+  it("referme la fiche sans rien transmettre quand j'annule la modification", () => {
+    const modifier = vi.fn(async () => ({}));
+    afficher(contactSuivi(), { modifier });
+
+    fireEvent.click(screen.getByRole("button", { name: "Modifier" }));
+    fireEvent.click(screen.getByRole("button", { name: "Annuler" }));
+
+    expect(screen.queryByLabelText("Nom")).toBeNull();
+    expect(modifier).not.toHaveBeenCalled();
+  });
+
+  it("supprime le contact après confirmation", () => {
+    const supprimer = vi.fn(async () => {});
+    afficher(contactSuivi(), { supprimer });
+
+    fireEvent.click(screen.getByRole("button", { name: "Supprimer" }));
+    expect(supprimer).not.toHaveBeenCalled();
+    screen.getByText("Supprimer Claire Vasseur ? Cette action est définitive.");
+    fireEvent.click(screen.getByRole("button", { name: "Confirmer la suppression" }));
+
+    expect(supprimer).toHaveBeenCalledExactlyOnceWith(7);
+  });
+
+  it("ne change rien quand j'annule la suppression", () => {
+    const supprimer = vi.fn(async () => {});
+    afficher(contactSuivi(), { supprimer });
+
+    fireEvent.click(screen.getByRole("button", { name: "Supprimer" }));
+    fireEvent.click(screen.getByRole("button", { name: "Annuler" }));
+
+    expect(supprimer).not.toHaveBeenCalled();
+    expect(screen.queryByText(/Cette action est définitive/)).toBeNull();
+    screen.getByRole("heading", { name: "Claire Vasseur" });
+    screen.getByRole("button", { name: "Supprimer" });
+  });
 });

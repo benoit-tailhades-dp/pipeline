@@ -72,7 +72,7 @@ Statut : livré
 
 ## Lot 6 : Modifier ou supprimer un contact
 
-Statut : à faire
+Statut : livré
 
 **Parcours.** J'ouvre un contact pour compléter ou corriger ses informations : nom, entreprise, fonction, e-mail, téléphone. Je peux aussi le supprimer, après une confirmation.
 

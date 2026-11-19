@@ -3,6 +3,7 @@
 import { refresh } from "next/cache";
 
 import type { EtatFormulaireContact } from "@/components/contacts/formulaire-contact";
+import type { EtatFiche, ValeursFiche } from "@/components/contacts/fiche-contact";
 import type { EtatMarquage, SaisieMarquage } from "@/components/contacts/marquer-relance";
 import type { EtatRelance } from "@/components/contacts/relance-contact";
 import { contactService } from "@/server/container";
@@ -53,4 +54,16 @@ export async function marquerRelance(id: number, saisie: SaisieMarquage): Promis
   if (!resultat.ok) return { erreur: resultat.erreur, valeurs: saisie };
   refresh();
   return {};
+}
+
+export async function modifierContact(id: number, valeurs: ValeursFiche): Promise<EtatFiche> {
+  const resultat = await (await contactService()).modifier(id, valeurs);
+  if (!resultat.ok) return { erreurs: resultat.erreurs, valeurs };
+  refresh();
+  return {};
+}
+
+export async function supprimerContact(id: number): Promise<void> {
+  await (await contactService()).supprimer(id);
+  refresh();
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useTransition } from "react";
+import { useId, useState, useTransition } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ import type {
 } from "@/services/contact-service";
 
 import { formaterDateCourte } from "./dates";
+import { FicheContact, type EtatFiche, type ValeursFiche } from "./fiche-contact";
 import { RelanceContact, type EtatRelance } from "./relance-contact";
 
 const LIBELLES_ETAPES: Record<Etape, string> = {
@@ -109,9 +110,54 @@ export interface ActionsContact {
   changerEtape: (id: number, etape: Etape) => Promise<void>;
   planifierRelance: (id: number, date: string) => Promise<EtatRelance>;
   retirerRelance: (id: number) => Promise<void>;
+  modifier: (id: number, valeurs: ValeursFiche) => Promise<EtatFiche>;
+  supprimer: (id: number) => Promise<void>;
 }
 
-export function CarteContact({
+function Coordonnees({ contact }: { contact: ContactSuivi }) {
+  const lignes = [contact.email, contact.telephone].filter((ligne) => ligne !== null);
+  if (lignes.length === 0) return null;
+  return (
+    <ul className="flex flex-wrap gap-x-4 gap-y-1 text-muted-foreground">
+      {lignes.map((ligne) => (
+        <li key={ligne}>{ligne}</li>
+      ))}
+    </ul>
+  );
+}
+
+function ConfirmationSuppression({
+  contact,
+  supprimerAction,
+  onAnnule,
+}: {
+  contact: ContactSuivi;
+  supprimerAction: (id: number) => Promise<void>;
+  onAnnule: () => void;
+}) {
+  const [enCours, demarrer] = useTransition();
+  return (
+    <div className="grid gap-3 rounded-lg bg-destructive/10 p-3 pl-4">
+      <p className="font-semibold">
+        Supprimer {contact.nom} ? Cette action est définitive.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" disabled={enCours} onClick={onAnnule}>
+          Annuler
+        </Button>
+        <Button
+          variant="destructive"
+          disabled={enCours}
+          onClick={() => demarrer(() => supprimerAction(contact.id))}
+        >
+          Confirmer la suppression
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function Suivi({
   contact,
   etapes,
   actions,
@@ -128,70 +174,117 @@ export function CarteContact({
   }));
 
   return (
+    <>
+      <div className="grid gap-2">
+        <Piste etapes={etapes} position={contact.position} />
+        <p className="text-muted-foreground">
+          Étape {contact.position} sur {etapes.length}
+        </p>
+      </div>
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="grid min-w-56 flex-1 gap-2">
+          <Label htmlFor={idEtape}>Étape</Label>
+          <Select
+            items={choix}
+            value={contact.etape}
+            disabled={enCours}
+            onValueChange={(etape) => {
+              if (etape && etape !== contact.etape) {
+                demarrer(() => actions.changerEtape(contact.id, etape));
+              }
+            }}
+          >
+            <SelectTrigger id={idEtape} className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {choix.map((c) => (
+                <SelectItem key={c.value} value={c.value}>
+                  {c.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {contact.suivante && (
+          <Button
+            size="lg"
+            disabled={enCours}
+            onClick={() => demarrer(() => actions.avancer(contact.id))}
+          >
+            Étape suivante
+          </Button>
+        )}
+      </div>
+      {contact.note && <p className="text-base">{contact.note}</p>}
+      {contact.dernierEchangeLe !== null && contact.joursDepuisDernierEchange !== null && (
+        <p className="text-muted-foreground">
+          Dernier échange :{" "}
+          {dernierEchangeEnClair(contact.joursDepuisDernierEchange, contact.dernierEchangeLe)}
+        </p>
+      )}
+      <RelanceContact
+        contact={contact}
+        planifierAction={actions.planifierRelance}
+        retirerAction={actions.retirerRelance}
+      />
+    </>
+  );
+}
+
+export function CarteContact({
+  contact,
+  etapes,
+  actions,
+}: {
+  contact: ContactSuivi;
+  etapes: readonly EtapeDuParcours[];
+  actions: ActionsContact;
+}) {
+  const [mode, setMode] = useState<"suivi" | "fiche" | "suppression">("suivi");
+  const description = [contact.fonction, contact.entreprise].filter(Boolean).join(", ");
+
+  return (
     <Card size="sm">
       <CardHeader>
         <CardTitle role="heading" aria-level={3} className="text-lg font-bold tracking-tight">
           {contact.nom}
         </CardTitle>
-        {contact.entreprise && <CardDescription>{contact.entreprise}</CardDescription>}
+        {description && <CardDescription>{description}</CardDescription>}
         <CardAction className="self-center">
           <Pastille temperature={contact.temperature} />
         </CardAction>
       </CardHeader>
       <CardContent className="grid gap-4">
-        <div className="grid gap-2">
-          <Piste etapes={etapes} position={contact.position} />
-          <p className="text-muted-foreground">
-            Étape {contact.position} sur {etapes.length}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="grid min-w-56 flex-1 gap-2">
-            <Label htmlFor={idEtape}>Étape</Label>
-            <Select
-              items={choix}
-              value={contact.etape}
-              disabled={enCours}
-              onValueChange={(etape) => {
-                if (etape && etape !== contact.etape) {
-                  demarrer(() => actions.changerEtape(contact.id, etape));
-                }
-              }}
-            >
-              <SelectTrigger id={idEtape} className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {choix.map((c) => (
-                  <SelectItem key={c.value} value={c.value}>
-                    {c.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {contact.suivante && (
-            <Button
-              size="lg"
-              disabled={enCours}
-              onClick={() => demarrer(() => actions.avancer(contact.id))}
-            >
-              Étape suivante
-            </Button>
-          )}
-        </div>
-        {contact.note && <p className="text-base">{contact.note}</p>}
-        {contact.dernierEchangeLe !== null && contact.joursDepuisDernierEchange !== null && (
-          <p className="text-muted-foreground">
-            Dernier échange :{" "}
-            {dernierEchangeEnClair(contact.joursDepuisDernierEchange, contact.dernierEchangeLe)}
-          </p>
+        {mode === "fiche" ? (
+          <FicheContact
+            contact={contact}
+            modifierAction={actions.modifier}
+            onEnregistre={() => setMode("suivi")}
+            onAnnule={() => setMode("suivi")}
+          />
+        ) : (
+          <>
+            <Coordonnees contact={contact} />
+            <Suivi contact={contact} etapes={etapes} actions={actions} />
+            {mode === "suppression" ? (
+              <ConfirmationSuppression
+                contact={contact}
+                supprimerAction={actions.supprimer}
+                onAnnule={() => setMode("suivi")}
+              />
+            ) : (
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setMode("fiche")}>
+                  Modifier
+                </Button>
+                <Button variant="destructive" size="sm" onClick={() => setMode("suppression")}>
+                  Supprimer
+                </Button>
+              </div>
+            )}
+          </>
         )}
-        <RelanceContact
-          contact={contact}
-          planifierAction={actions.planifierRelance}
-          retirerAction={actions.retirerRelance}
-        />
       </CardContent>
     </Card>
   );

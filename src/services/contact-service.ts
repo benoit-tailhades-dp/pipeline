@@ -42,7 +42,22 @@ export interface SaisieContact {
 
 export interface ErreursContact {
   nom?: string;
+  email?: string;
+  /** Erreur qui ne porte sur aucun champ, comme un contact supprimé entre-temps. */
+  contact?: string;
 }
+
+export interface SaisieFiche {
+  nom: string;
+  entreprise?: string;
+  fonction?: string;
+  email?: string;
+  telephone?: string;
+}
+
+export type ResultatModification =
+  | { ok: true; contact: ContactSuivi }
+  | { ok: false; erreurs: ErreursContact };
 
 export type ResultatAjout =
   | { ok: true; contact: Contact }
@@ -84,6 +99,16 @@ function suivre(contact: Contact, jour: string): ContactSuivi {
 
 const CONTACT_INCONNU = { ok: false, erreur: "Ce contact n'existe plus." } as const;
 
+const NOM_MANQUANT = "Indiquez le nom du contact.";
+const EMAIL_INVALIDE = "Cette adresse e-mail n'est pas valide.";
+/** Une partie locale, un @, un domaine avec au moins un point, sans espace. */
+const FORME_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** La saisie sans espaces autour, ou `null` si elle est vide. */
+function valeurOuNull(saisie: string | undefined): string | null {
+  return saisie?.trim() || null;
+}
+
 /** Fuseau de l'utilisateur : c'est à son heure que commence « aujourd'hui ». */
 const FUSEAU_PAR_DEFAUT = "Europe/Paris";
 
@@ -112,9 +137,9 @@ export function createContactService({
     async ajouter(saisie: SaisieContact): Promise<ResultatAjout> {
       const nom = saisie.nom.trim();
       if (nom === "") {
-        return { ok: false, erreurs: { nom: "Indiquez le nom du contact." } };
+        return { ok: false, erreurs: { nom: NOM_MANQUANT } };
       }
-      const entreprise = saisie.entreprise?.trim() || null;
+      const entreprise = valeurOuNull(saisie.entreprise);
       const contact = await contacts.ajouter({
         nom,
         entreprise,
@@ -191,6 +216,30 @@ export function createContactService({
           relanceLe: prochaineRelance,
         }),
       );
+    },
+
+    /** Corrige la fiche. Le nom est obligatoire, l'e-mail facultatif mais bien formé. */
+    async modifier(id: number, saisie: SaisieFiche): Promise<ResultatModification> {
+      const nom = saisie.nom.trim();
+      const email = valeurOuNull(saisie.email);
+      const erreurs: ErreursContact = {};
+      if (nom === "") erreurs.nom = NOM_MANQUANT;
+      if (email !== null && !FORME_EMAIL.test(email)) erreurs.email = EMAIL_INVALIDE;
+      if (erreurs.nom || erreurs.email) return { ok: false, erreurs };
+
+      const contact = await contacts.modifier(id, {
+        nom,
+        entreprise: valeurOuNull(saisie.entreprise),
+        fonction: valeurOuNull(saisie.fonction),
+        email,
+        telephone: valeurOuNull(saisie.telephone),
+      });
+      if (!contact) return { ok: false, erreurs: { contact: CONTACT_INCONNU.erreur } };
+      return { ok: true, contact: suivre(contact, aujourdhui()) };
+    },
+
+    async supprimer(id: number): Promise<{ ok: true } | { ok: false; erreur: string }> {
+      return (await contacts.supprimer(id)) ? { ok: true } : CONTACT_INCONNU;
     },
 
     /** Les relances dues aujourd'hui ou en retard, les plus en retard en premier. */

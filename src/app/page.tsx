@@ -6,8 +6,10 @@ import {
   avancerEtape,
   changerEtape,
   marquerRelance,
+  modifierContact,
   planifierRelance,
   retirerRelance,
+  supprimerContact,
 } from "@/app/actions";
 import type { ActionsContact } from "@/components/contacts/carte-contact";
 import { FormulaireContact } from "@/components/contacts/formulaire-contact";
@@ -20,6 +22,8 @@ const actionsContact: ActionsContact = {
   changerEtape,
   planifierRelance,
   retirerRelance,
+  modifier: modifierContact,
+  supprimer: supprimerContact,
 };
 
 async function RelancesDuJour() {

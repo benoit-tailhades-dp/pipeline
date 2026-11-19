@@ -13,6 +13,9 @@ export interface Contact {
   id: number;
   nom: string;
   entreprise: string | null;
+  fonction: string | null;
+  email: string | null;
+  telephone: string | null;
   etape: Etape;
   relanceLe: DateCalendrier | null;
   dernierEchangeLe: DateCalendrier | null;
@@ -26,6 +29,15 @@ export interface Echange {
   dernierEchangeLe: DateCalendrier;
   note: string | null;
   relanceLe: DateCalendrier | null;
+}
+
+/** Coordonnées modifiables d'un contact. */
+export interface Fiche {
+  nom: string;
+  entreprise: string | null;
+  fonction: string | null;
+  email: string | null;
+  telephone: string | null;
 }
 
 export interface NouveauContact {
@@ -48,6 +60,10 @@ export interface ContactRepository {
   changerRelance(id: number, date: DateCalendrier | null): Promise<Contact | null>;
   /** Enregistre l'échange tel quel, ou renvoie `null` si le contact n'existe pas. */
   enregistrerEchange(id: number, echange: Echange): Promise<Contact | null>;
+  /** Enregistre la fiche telle quelle, ou renvoie `null` si le contact n'existe pas. */
+  modifier(id: number, fiche: Fiche): Promise<Contact | null>;
+  /** Supprime le contact. `false` s'il n'existait pas. */
+  supprimer(id: number): Promise<boolean>;
   /** Les contacts dont la relance tombe à cette date ou avant, sans ordre garanti. */
   listerRelancesJusquAu(date: DateCalendrier): Promise<Contact[]>;
 }

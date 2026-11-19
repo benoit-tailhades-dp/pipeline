@@ -27,6 +27,8 @@ Lot 4 livré : section « À relancer aujourd’hui » en tête de l'accueil (`L
 
 Lot 5 livré : « Marquer comme relancé » dans « À relancer aujourd’hui » (`MarquerRelance`). Le service enregistre l'échange du jour (`marquerRelance` puis `enregistrerEchange` dans le repository). Sans note saisie, la note précédente est gardée. Sans relance suivante, aucune relance n'est planifiée. Une relance suivante doit tomber après aujourd'hui. La carte affiche la note et « Dernier échange : … » à partir de `joursDepuisDernierEchange`.
 
+Lot 6 livré : depuis la carte, « Modifier » ouvre la fiche (`FicheContact` : nom, entreprise, fonction, e-mail, téléphone) et « Supprimer » demande une confirmation dans la carte, sans boîte de dialogue. Le service valide le nom et la forme de l'e-mail (`modifier`). Le formulaire est en `noValidate` pour que ce soit le message du service qui s'affiche.
+
 Le découpage en lots, avec les critères d'acceptation et le statut de chaque lot, est dans `LOTS.md`.
 
 ## Organisation des couches

@@ -12,6 +12,9 @@ function fauxRepository(): ContactRepository {
     async ajouter(nouveau) {
       const contact: Contact = {
         id: prochainId++,
+        fonction: null,
+        email: null,
+        telephone: null,
         relanceLe: null,
         dernierEchangeLe: null,
         note: null,
@@ -44,6 +47,18 @@ function fauxRepository(): ContactRepository {
       if (!contact) return null;
       Object.assign(contact, echange);
       return { ...contact };
+    },
+    async modifier(id, fiche) {
+      const contact = contacts.find((c) => c.id === id);
+      if (!contact) return null;
+      Object.assign(contact, fiche);
+      return { ...contact };
+    },
+    async supprimer(id) {
+      const index = contacts.findIndex((c) => c.id === id);
+      if (index === -1) return false;
+      contacts.splice(index, 1);
+      return true;
     },
     async listerRelancesJusquAu(date) {
       return contacts
@@ -567,6 +582,127 @@ describe("ContactService", () => {
       await contactA("demo");
 
       await expect(service.lister()).resolves.toMatchObject([{ joursDepuisDernierEchange: null }]);
+    });
+  });
+
+  describe("modifier", () => {
+    const fiche = {
+      nom: "Claire Vasseur",
+      entreprise: "Vernier Industrie",
+      fonction: "Responsable PLM",
+      email: "claire.vasseur@vernier.fr",
+      telephone: "06 12 34 56 78",
+    };
+
+    it("enregistre la nouvelle entreprise, que la liste affiche", async () => {
+      const contact = await contactA("demo");
+
+      const resultat = await service.modifier(contact.id, { ...fiche, entreprise: "Vernier Industrie" });
+
+      expect(resultat).toEqual({
+        ok: true,
+        contact: expect.objectContaining({ id: contact.id, entreprise: "Vernier Industrie" }),
+      });
+      await expect(service.lister()).resolves.toMatchObject([
+        { nom: "Claire Vasseur", entreprise: "Vernier Industrie" },
+      ]);
+    });
+
+    it("enregistre fonction, e-mail et téléphone, sans toucher à l'étape ni à la relance", async () => {
+      const contact = await contactA("demo");
+      await repository.changerRelance(contact.id, "2026-11-24");
+
+      await service.modifier(contact.id, fiche);
+
+      await expect(repository.trouver(contact.id)).resolves.toMatchObject({
+        ...fiche,
+        etape: "demo",
+        relanceLe: "2026-11-24",
+      });
+    });
+
+    it("retire les espaces et enregistre les champs facultatifs vides comme absents", async () => {
+      const contact = await contactA("demo");
+
+      await service.modifier(contact.id, {
+        nom: "  Claire Vasseur ",
+        entreprise: "  ",
+        fonction: "",
+        email: " claire.vasseur@vernier.fr ",
+        telephone: undefined,
+      });
+
+      await expect(repository.trouver(contact.id)).resolves.toMatchObject({
+        nom: "Claire Vasseur",
+        entreprise: null,
+        fonction: null,
+        email: "claire.vasseur@vernier.fr",
+        telephone: null,
+      });
+    });
+
+    it.each(["", "   "])("refuse le nom %j sans rien modifier", async (nom) => {
+      const contact = await contactA("demo");
+
+      await expect(service.modifier(contact.id, { ...fiche, nom })).resolves.toEqual({
+        ok: false,
+        erreurs: { nom: "Indiquez le nom du contact." },
+      });
+      await expect(repository.trouver(contact.id)).resolves.toEqual(contact);
+    });
+
+    it.each(["claire", "claire@", "claire@vernier", "claire vasseur@vernier.fr", "@vernier.fr"])(
+      "refuse l'e-mail mal formé %j sans rien modifier",
+      async (email) => {
+        const contact = await contactA("demo");
+
+        await expect(service.modifier(contact.id, { ...fiche, email })).resolves.toEqual({
+          ok: false,
+          erreurs: { email: "Cette adresse e-mail n'est pas valide." },
+        });
+        await expect(repository.trouver(contact.id)).resolves.toEqual(contact);
+      },
+    );
+
+    it("signale ensemble un nom vide et un e-mail mal formé", async () => {
+      const contact = await contactA("demo");
+
+      await expect(
+        service.modifier(contact.id, { ...fiche, nom: "", email: "claire" }),
+      ).resolves.toEqual({
+        ok: false,
+        erreurs: {
+          nom: "Indiquez le nom du contact.",
+          email: "Cette adresse e-mail n'est pas valide.",
+        },
+      });
+    });
+
+    it("refuse un contact inconnu", async () => {
+      await expect(service.modifier(42, fiche)).resolves.toEqual({
+        ok: false,
+        erreurs: { contact: "Ce contact n'existe plus." },
+      });
+    });
+  });
+
+  describe("supprimer", () => {
+    it("retire le contact de la liste et de « À relancer aujourd'hui »", async () => {
+      const contact = await contactA("demo");
+      await repository.changerRelance(contact.id, "2026-11-18");
+      await expect(service.aRelancer()).resolves.toHaveLength(1);
+
+      await expect(service.supprimer(contact.id)).resolves.toEqual({ ok: true });
+
+      await expect(service.lister()).resolves.toEqual([]);
+      await expect(service.aRelancer()).resolves.toEqual([]);
+    });
+
+    it("refuse un contact inconnu", async () => {
+      await expect(service.supprimer(42)).resolves.toEqual({
+        ok: false,
+        erreur: "Ce contact n'existe plus.",
+      });
     });
   });
 });

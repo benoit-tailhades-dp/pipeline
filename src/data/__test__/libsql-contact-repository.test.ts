@@ -17,7 +17,22 @@ const claire = {
 };
 
 /** Champs que l'ajout laisse vides. */
-const vides = { relanceLe: null, dernierEchangeLe: null, note: null };
+const vides = {
+  fonction: null,
+  email: null,
+  telephone: null,
+  relanceLe: null,
+  dernierEchangeLe: null,
+  note: null,
+};
+
+const fiche = {
+  nom: "Claire Vasseur",
+  entreprise: "Vernier Industrie",
+  fonction: "Responsable PLM",
+  email: "claire.vasseur@vernier.fr",
+  telephone: "06 12 34 56 78",
+};
 
 describe("LibsqlContactRepository", () => {
   let db: Db;
@@ -194,6 +209,70 @@ describe("LibsqlContactRepository", () => {
     });
   });
 
+  describe("modifier", () => {
+    it("enregistre la fiche et renvoie le contact modifié", async () => {
+      const ajoute = await repository.ajouter(claire);
+      await repository.changerRelance(ajoute.id, "2026-11-24");
+
+      const modifie = await repository.modifier(ajoute.id, fiche);
+
+      expect(modifie).toEqual({ ...ajoute, ...fiche, relanceLe: "2026-11-24" });
+      await expect(repository.trouver(ajoute.id)).resolves.toEqual(modifie);
+    });
+
+    it("vide les champs facultatifs reçus à null", async () => {
+      const ajoute = await repository.ajouter(claire);
+      await repository.modifier(ajoute.id, fiche);
+
+      await repository.modifier(ajoute.id, {
+        nom: "Claire Vasseur",
+        entreprise: null,
+        fonction: null,
+        email: null,
+        telephone: null,
+      });
+
+      await expect(repository.trouver(ajoute.id)).resolves.toMatchObject({
+        entreprise: null,
+        fonction: null,
+        email: null,
+        telephone: null,
+      });
+    });
+
+    it("ne touche pas aux autres contacts", async () => {
+      const marc = await repository.ajouter({ ...claire, nom: "Marc Delorme" });
+      const ajoute = await repository.ajouter(claire);
+
+      await repository.modifier(ajoute.id, fiche);
+
+      await expect(repository.trouver(marc.id)).resolves.toEqual(marc);
+    });
+
+    it("renvoie null pour un contact inconnu", async () => {
+      await expect(repository.modifier(42, fiche)).resolves.toBeNull();
+    });
+  });
+
+  describe("supprimer", () => {
+    it("supprime le contact et renvoie true", async () => {
+      const marc = await repository.ajouter({ ...claire, nom: "Marc Delorme" });
+      const ajoute = await repository.ajouter(claire);
+
+      await expect(repository.supprimer(ajoute.id)).resolves.toBe(true);
+
+      await expect(repository.trouver(ajoute.id)).resolves.toBeNull();
+      await expect(repository.lister()).resolves.toEqual([marc]);
+    });
+
+    it("renvoie false pour un contact inconnu", async () => {
+      const ajoute = await repository.ajouter(claire);
+
+      await expect(repository.supprimer(ajoute.id + 1)).resolves.toBe(false);
+      await expect(repository.lister()).resolves.toEqual([ajoute]);
+    });
+  });
+
   describe("listerRelancesJusquAu", () => {
     async function avecRelance(nom: string, relanceLe: string | null) {
       const ajoute = await repository.ajouter({ ...claire, nom });
@@ -298,6 +377,19 @@ describe("LibsqlContactRepository sur un fichier", () => {
       note: "Rappeler après l'audit de juin",
       relanceLe: "2026-12-02",
     });
+  });
+
+  it("conserve la fiche modifiée après un redémarrage", async () => {
+    const avant = createDb(url);
+    await appliquerSchema(avant);
+    const repository = createLibsqlContactRepository(avant);
+    const ajoute = await repository.ajouter(claire);
+    await repository.modifier(ajoute.id, fiche);
+    avant.close();
+
+    await expect(
+      apresRedemarrage((repository) => repository.trouver(ajoute.id)),
+    ).resolves.toMatchObject(fiche);
   });
 
   it("place à « À contacter » les contacts d'une base créée avant les étapes", async () => {

@@ -2,7 +2,8 @@ import type { Contact, ContactRepository, DateCalendrier, Etape } from "./contac
 import type { Db, Ligne } from "./db";
 
 /** Colonnes lues pour reconstruire un `Contact` : une constante, jamais une valeur saisie. */
-const COLONNES = "id, nom, entreprise, etape, relance_le, dernier_echange_le, note, cree_le";
+const COLONNES =
+  "id, nom, entreprise, fonction, email, telephone, etape, relance_le, dernier_echange_le, note, cree_le";
 
 // Requêtes paramétrées : les valeurs passent toujours par `args`.
 const SQL = {
@@ -11,6 +12,8 @@ const SQL = {
   trouver: `SELECT ${COLONNES} FROM contacts WHERE id = ?`,
   changerEtape: `UPDATE contacts SET etape = ? WHERE id = ? RETURNING ${COLONNES}`,
   changerRelance: `UPDATE contacts SET relance_le = ? WHERE id = ? RETURNING ${COLONNES}`,
+  modifier: `UPDATE contacts SET nom = ?, entreprise = ?, fonction = ?, email = ?, telephone = ? WHERE id = ? RETURNING ${COLONNES}`,
+  supprimer: "DELETE FROM contacts WHERE id = ?",
   enregistrerEchange: `UPDATE contacts SET dernier_echange_le = ?, note = ?, relance_le = ? WHERE id = ? RETURNING ${COLONNES}`,
   // Les dates AAAA-MM-JJ se comparent comme des chaînes.
   listerRelancesJusquAu: `SELECT ${COLONNES} FROM contacts WHERE relance_le IS NOT NULL AND relance_le <= ?`,
@@ -26,6 +29,9 @@ function versContact(ligne: Ligne): Contact {
     id: Number(ligne.id),
     nom: String(ligne.nom),
     entreprise: texteOuNull(ligne.entreprise),
+    fonction: texteOuNull(ligne.fonction),
+    email: texteOuNull(ligne.email),
+    telephone: texteOuNull(ligne.telephone),
     // Seul le service écrit l'étape : la colonne ne contient que des valeurs de `Etape`.
     etape: String(ligne.etape) as Etape,
     relanceLe: texteOuNull(ligne.relance_le) as DateCalendrier | null,
@@ -79,6 +85,22 @@ export function createLibsqlContactRepository(db: Db): ContactRepository {
         echange.relanceLe,
         id,
       ]);
+    },
+
+    modifier(id, fiche) {
+      return unContact(SQL.modifier, [
+        fiche.nom,
+        fiche.entreprise,
+        fiche.fonction,
+        fiche.email,
+        fiche.telephone,
+        id,
+      ]);
+    },
+
+    async supprimer(id) {
+      const resultat = await db.execute({ sql: SQL.supprimer, args: [id] });
+      return resultat.rowsAffected > 0;
     },
 
     async listerRelancesJusquAu(date) {
