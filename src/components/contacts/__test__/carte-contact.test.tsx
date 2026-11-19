@@ -3,221 +3,111 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ContactSuivi } from "@/services/contact-service";
 
-import { CarteContact, type ActionsContact } from "../carte-contact";
-import { actionsInertes, contactSuivi, etapes } from "./fixtures";
+import { CarteContact } from "../carte-contact";
+import { contactSuivi, enDemo, parTexte } from "./fixtures";
 
-const nouveau = contactSuivi();
-
-const enDemo = contactSuivi({
-  etape: "demo",
-  temperature: "tiede",
-  position: 3,
-  suivante: "proposition",
-});
-
-const enProposition = contactSuivi({
-  etape: "proposition",
-  temperature: "chaud",
-  position: 4,
-  suivante: "gagne",
-});
-
-const gagne = contactSuivi({ etape: "gagne", temperature: "signe", position: 5, suivante: null });
-
-function afficher(contact: ContactSuivi, actions: Partial<ActionsContact> = {}) {
+function afficher(
+  contact: ContactSuivi,
+  rappels: Partial<Record<"onOuvrir" | "onAvancer" | "onDeplacer", () => void>> = {},
+) {
   return render(
-    <CarteContact contact={contact} etapes={etapes} actions={{ ...actionsInertes, ...actions }} />,
+    <CarteContact
+      contact={contact}
+      onOuvrir={rappels.onOuvrir ?? (() => {})}
+      onAvancer={rappels.onAvancer ?? (() => {})}
+      onDeplacer={rappels.onDeplacer ?? (() => {})}
+    />,
   );
 }
 
-function menuEtape() {
-  return screen.getByRole("combobox", { name: "Étape" });
-}
-
-/** Valeur affichée dans le menu, sans le chevron. */
-function etapeAffichee() {
-  return menuEtape().querySelector("[data-slot=select-value]")?.textContent;
-}
+const gagne = contactSuivi({ etape: "gagne", temperature: "signe", position: 5, suivante: null });
 
 describe("CarteContact", () => {
-  it("affiche le nom et l'entreprise du contact", () => {
-    afficher(nouveau);
+  it("affiche le nom, l'entreprise et la note", () => {
+    afficher(enDemo({ note: "Veut migrer ses nomenclatures avant l’audit de juin." }));
 
     screen.getByRole("heading", { name: "Claire Vasseur" });
     screen.getByText("Ateliers Vernier");
+    screen.getByText("Veut migrer ses nomenclatures avant l’audit de juin.");
   });
 
-  it("affiche un nouveau contact à « À contacter », avec la pastille Froid", () => {
-    afficher(nouveau);
+  it("affiche la fonction quand l'entreprise manque", () => {
+    afficher(contactSuivi({ entreprise: null, fonction: "Responsable PLM" }));
 
-    expect(etapeAffichee()).toBe("À contacter");
-    screen.getByText("Froid");
-    screen.getByRole("img", { name: "Étape 1 sur 5" });
+    screen.getByText("Responsable PLM");
   });
 
-  it("affiche un contact en démo avec la pastille Tiède et la piste à 3 sur 5", () => {
-    afficher(enDemo);
+  it.each([
+    [{ relanceLe: "2026-11-15", retardRelance: 3 }, "En retard de 3 j"],
+    [{ relanceLe: "2026-11-18", retardRelance: 0 }, "Aujourd’hui"],
+    [{ relanceLe: "2026-11-19", retardRelance: -1 }, "Demain"],
+    [{ relanceLe: "2026-11-24", retardRelance: -6 }, "Relance le 24 nov."],
+    [{ relanceLe: null, retardRelance: null }, "Sans relance"],
+  ])("indique la relance %j par « %s »", (champs, texte) => {
+    afficher(enDemo(champs));
 
-    expect(etapeAffichee()).toBe("Démo planifiée");
-    screen.getByText("Tiède");
-    screen.getByRole("img", { name: "Étape 3 sur 5" });
+    screen.getByText(parTexte(texte));
   });
 
-  it("affiche la pastille Chaud pour une proposition, Signé pour un contact gagné", () => {
-    const { unmount } = afficher(enProposition);
-    screen.getByText("Chaud");
-    unmount();
-
-    afficher(gagne);
-    screen.getByText("Signé");
-  });
-
-  it("colore la piste jusqu'à l'étape courante", () => {
-    afficher(enDemo);
-
-    const piste = screen.getByRole("img", { name: "Étape 3 sur 5" });
-    const segments = Array.from(piste.children) as HTMLElement[];
-    expect(segments.map((segment) => segment.dataset.franchie)).toEqual([
-      "true",
-      "true",
-      "true",
-      "false",
-      "false",
-    ]);
-  });
-
-  it("transmet l'identifiant du contact quand je clique sur « Étape suivante »", () => {
-    const avancer = vi.fn(async () => {});
-    afficher(enDemo, { avancer });
-
-    fireEvent.click(screen.getByRole("button", { name: "Étape suivante" }));
-
-    expect(avancer).toHaveBeenCalledExactlyOnceWith(7);
-  });
-
-  it("ne propose pas « Étape suivante » pour un contact « Gagné »", () => {
+  it("indique « Signé » pour un contact gagné sans relance", () => {
     afficher(gagne);
 
-    expect(screen.queryByRole("button", { name: "Étape suivante" })).toBeNull();
-    // L'étape reste corrigeable depuis la liste.
-    expect(etapeAffichee()).toBe("Gagné");
+    screen.getByText(parTexte("Signé"));
+    expect(screen.queryByText(parTexte("Sans relance"))).toBeNull();
   });
 
-  it("transmet l'étape choisie dans la liste des étapes", async () => {
-    const changerEtape = vi.fn(async () => {});
-    afficher(enProposition, { changerEtape });
+  it.each([
+    [0, "2026-11-18", "Dernier échange : aujourd’hui"],
+    [1, "2026-11-17", "Dernier échange : hier"],
+    [14, "2026-11-04", "Dernier échange : il y a 14 j"],
+  ])("indique un dernier échange vieux de %i jours", (jours, date, texte) => {
+    afficher(enDemo({ dernierEchangeLe: date, joursDepuisDernierEchange: jours }));
 
-    expect(etapeAffichee()).toBe("Proposition envoyée");
-    fireEvent.click(menuEtape());
-    const options = await screen.findAllByRole("option");
-    expect(options.map((option) => option.textContent)).toEqual([
-      "À contacter",
-      "Premier échange",
-      "Démo planifiée",
-      "Proposition envoyée",
-      "Gagné",
-    ]);
-    // Base UI ne valide un clic de souris que s'il commence sur l'option, comme dans un navigateur.
-    const premierEchange = screen.getByRole("option", { name: "Premier échange" });
-    fireEvent.pointerDown(premierEchange, { pointerType: "mouse" });
-    fireEvent.click(premierEchange);
-
-    expect(changerEtape).toHaveBeenCalledExactlyOnceWith(7, "premier-echange");
+    screen.getByText(parTexte(texte));
   });
 
-  it("affiche la relance planifiée", () => {
-    afficher(contactSuivi({ relanceLe: "2026-11-24" }));
-
-    screen.getByText("Relance le 24 nov.");
-  });
-
-  it("affiche « Dernier échange : aujourd’hui » pour un échange du jour", () => {
-    afficher(contactSuivi({ dernierEchangeLe: "2026-11-18", joursDepuisDernierEchange: 0 }));
-
-    screen.getByText("Dernier échange : aujourd’hui");
-  });
-
-  it("affiche « hier », puis la date, pour un échange plus ancien", () => {
-    const { unmount } = afficher(
-      contactSuivi({ dernierEchangeLe: "2026-11-17", joursDepuisDernierEchange: 1 }),
-    );
-    screen.getByText("Dernier échange : hier");
-    unmount();
-
-    afficher(contactSuivi({ dernierEchangeLe: "2026-11-04", joursDepuisDernierEchange: 14 }));
-    screen.getByText("Dernier échange : le 4 nov.");
-  });
-
-  it("n'affiche pas de dernier échange quand il n'y en a pas eu", () => {
-    afficher(contactSuivi());
+  it("n'indique pas de dernier échange quand il n'y en a pas eu", () => {
+    afficher(enDemo());
 
     expect(screen.queryByText(/Dernier échange/)).toBeNull();
   });
 
-  it("affiche la note du dernier échange", () => {
-    afficher(contactSuivi({ note: "Rappeler après l'audit de juin" }));
+  it("ouvre la fiche quand je clique sur la carte ou sur le nom", () => {
+    const onOuvrir = vi.fn();
+    afficher(enDemo(), { onOuvrir });
 
-    screen.getByText("Rappeler après l'audit de juin");
+    fireEvent.click(screen.getByText("Ateliers Vernier"));
+    fireEvent.click(screen.getByRole("button", { name: "Claire Vasseur" }));
+
+    expect(onOuvrir).toHaveBeenCalledTimes(2);
   });
 
-  it("affiche la fonction, l'e-mail et le téléphone", () => {
-    afficher(
-      contactSuivi({
-        fonction: "Responsable PLM",
-        email: "claire.vasseur@vernier.fr",
-        telephone: "06 12 34 56 78",
-      }),
-    );
+  it("passe à l'étape suivante avec la flèche, sans ouvrir la fiche", () => {
+    const onOuvrir = vi.fn();
+    const onAvancer = vi.fn();
+    afficher(enDemo(), { onOuvrir, onAvancer });
 
-    screen.getByText("Responsable PLM, Ateliers Vernier");
-    screen.getByText("claire.vasseur@vernier.fr");
-    screen.getByText("06 12 34 56 78");
+    fireEvent.click(screen.getByRole("button", { name: "Passer à « Proposition envoyée »" }));
+
+    expect(onAvancer).toHaveBeenCalledOnce();
+    expect(onOuvrir).not.toHaveBeenCalled();
   });
 
-  it("ouvre la fiche pré-remplie quand je clique sur « Modifier »", () => {
-    afficher(contactSuivi());
+  it("ne propose pas d'étape suivante pour un contact gagné", () => {
+    afficher(gagne);
 
-    fireEvent.click(screen.getByRole("button", { name: "Modifier" }));
-
-    expect((screen.getByLabelText("Nom") as HTMLInputElement).value).toBe("Claire Vasseur");
-    expect((screen.getByLabelText(/Entreprise/) as HTMLInputElement).value).toBe(
-      "Ateliers Vernier",
-    );
+    expect(screen.queryByRole("button", { name: /Passer à/ })).toBeNull();
   });
 
-  it("referme la fiche sans rien transmettre quand j'annule la modification", () => {
-    const modifier = vi.fn(async () => ({}));
-    afficher(contactSuivi(), { modifier });
+  it("change d'étape avec Maj + → et Maj + ← sur le nom", () => {
+    const onDeplacer = vi.fn();
+    afficher(enDemo(), { onDeplacer });
+    const nom = screen.getByRole("button", { name: "Claire Vasseur" });
 
-    fireEvent.click(screen.getByRole("button", { name: "Modifier" }));
-    fireEvent.click(screen.getByRole("button", { name: "Annuler" }));
+    fireEvent.keyDown(nom, { key: "ArrowRight", shiftKey: true });
+    fireEvent.keyDown(nom, { key: "ArrowLeft", shiftKey: true });
+    fireEvent.keyDown(nom, { key: "ArrowRight" });
 
-    expect(screen.queryByLabelText("Nom")).toBeNull();
-    expect(modifier).not.toHaveBeenCalled();
-  });
-
-  it("supprime le contact après confirmation", () => {
-    const supprimer = vi.fn(async () => {});
-    afficher(contactSuivi(), { supprimer });
-
-    fireEvent.click(screen.getByRole("button", { name: "Supprimer" }));
-    expect(supprimer).not.toHaveBeenCalled();
-    screen.getByText("Supprimer Claire Vasseur ? Cette action est définitive.");
-    fireEvent.click(screen.getByRole("button", { name: "Confirmer la suppression" }));
-
-    expect(supprimer).toHaveBeenCalledExactlyOnceWith(7);
-  });
-
-  it("ne change rien quand j'annule la suppression", () => {
-    const supprimer = vi.fn(async () => {});
-    afficher(contactSuivi(), { supprimer });
-
-    fireEvent.click(screen.getByRole("button", { name: "Supprimer" }));
-    fireEvent.click(screen.getByRole("button", { name: "Annuler" }));
-
-    expect(supprimer).not.toHaveBeenCalled();
-    expect(screen.queryByText(/Cette action est définitive/)).toBeNull();
-    screen.getByRole("heading", { name: "Claire Vasseur" });
-    screen.getByRole("button", { name: "Supprimer" });
+    expect(onDeplacer.mock.calls).toEqual([[1], [-1]]);
   });
 });

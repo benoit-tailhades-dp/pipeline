@@ -591,6 +591,118 @@ describe("ContactService", () => {
     });
   });
 
+  describe("retardRelance", () => {
+    // `maintenant` : le 18 novembre 2026 à 10 h, heure de Paris.
+    it.each([
+      ["2026-11-15", 3],
+      ["2026-11-18", 0],
+      ["2026-11-19", -1],
+      ["2026-11-24", -6],
+    ])("vaut %s → %i : positif en retard, 0 aujourd'hui, négatif à venir", async (date, attendu) => {
+      const contact = await contactA("demo");
+      await repository.changerRelance(contact.id, date);
+
+      await expect(service.lister()).resolves.toMatchObject([{ retardRelance: attendu }]);
+    });
+
+    it("vaut null sans relance", async () => {
+      await contactA("demo");
+
+      await expect(service.lister()).resolves.toMatchObject([{ retardRelance: null }]);
+    });
+  });
+
+  describe("tableau", () => {
+    // `maintenant` : le 18 novembre 2026 à 10 h, heure de Paris.
+
+    /** Ajoute un contact créé à l'heure `heure` du 18 novembre, avec ou sans relance. */
+    async function contact(nom: string, etape: Etape, heure: number, relance: string | null = null) {
+      const cree = await repository.ajouter({
+        nom,
+        entreprise: null,
+        etape,
+        creeLe: new Date(`2026-11-18T${String(heure).padStart(2, "0")}:00:00.000Z`),
+      });
+      if (relance) await repository.changerRelance(cree.id, relance);
+    }
+
+    it("renvoie les cinq étapes dans l'ordre, avec leur température, même vides", async () => {
+      const colonnes = await service.tableau();
+
+      expect(colonnes).toEqual([
+        { code: "a-contacter", temperature: "froid", contacts: [] },
+        { code: "premier-echange", temperature: "froid", contacts: [] },
+        { code: "demo", temperature: "tiede", contacts: [] },
+        { code: "proposition", temperature: "chaud", contacts: [] },
+        { code: "gagne", temperature: "signe", contacts: [] },
+      ]);
+    });
+
+    it("range chaque contact dans la colonne de son étape", async () => {
+      await contact("Claire Vasseur", "demo", 8);
+      await contact("Marc Delorme", "a-contacter", 8);
+      await contact("Inès Garnier", "demo", 9);
+      await contact("Paul Roche", "gagne", 8);
+
+      const colonnes = await service.tableau();
+
+      expect(colonnes.map((c) => [c.code, c.contacts.map((x) => x.nom)])).toEqual([
+        ["a-contacter", ["Marc Delorme"]],
+        ["premier-echange", []],
+        ["demo", ["Inès Garnier", "Claire Vasseur"]],
+        ["proposition", []],
+        ["gagne", ["Paul Roche"]],
+      ]);
+    });
+
+    it("décrit chaque contact comme la carte l'affiche", async () => {
+      await contact("Claire Vasseur", "demo", 8, "2026-11-15");
+
+      const [, , demo] = await service.tableau();
+
+      expect(demo.contacts).toEqual([
+        expect.objectContaining({
+          nom: "Claire Vasseur",
+          temperature: "tiede",
+          position: 3,
+          suivante: "proposition",
+          retardRelance: 3,
+        }),
+      ]);
+    });
+
+    it("place les relances dues d'abord, la plus en retard en tête, puis les autres du plus récent au plus ancien", async () => {
+      await contact("Ancien sans relance", "demo", 6);
+      await contact("Prévue demain", "demo", 7, "2026-11-19");
+      await contact("Du jour", "demo", 8, "2026-11-18");
+      await contact("En retard de 3 jours", "demo", 5, "2026-11-15");
+      await contact("Récent sans relance", "demo", 9);
+      await contact("En retard de 1 jour", "demo", 10, "2026-11-17");
+
+      const [, , demo] = await service.tableau();
+
+      expect(demo.contacts.map((c) => c.nom)).toEqual([
+        "En retard de 3 jours",
+        "En retard de 1 jour",
+        "Du jour",
+        "Récent sans relance",
+        "Prévue demain",
+        "Ancien sans relance",
+      ]);
+    });
+
+    it("place le dernier contact ajouté en tête de « À contacter » quand aucune relance n'est due", async () => {
+      maintenant = new Date("2026-11-18T09:00:00.000Z");
+      await service.ajouter({ nom: "Claire Vasseur" });
+      maintenant = new Date("2026-11-18T10:00:00.000Z");
+      await service.ajouter({ nom: "Marc Delorme" });
+
+      const [aContacter] = await service.tableau();
+
+      expect(aContacter.contacts.map((c) => c.nom)).toEqual(["Marc Delorme", "Claire Vasseur"]);
+    });
+  });
+
   describe("modifier", () => {
     const fiche = {
       nom: "Claire Vasseur",

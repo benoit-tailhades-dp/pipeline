@@ -1,10 +1,11 @@
 import type {
+  ColonneDuTableau,
   ContactARelancer,
   ContactSuivi,
   EtapeDuParcours,
 } from "@/services/contact-service";
 
-import type { ActionsContact } from "../carte-contact";
+import type { ActionsContact } from "../actions-contact";
 
 /** Liste telle que la renvoie le service : la présentation ne la reconstruit pas. */
 export const etapes: EtapeDuParcours[] = [
@@ -30,6 +31,7 @@ export function contactSuivi(champs: Partial<ContactSuivi> = {}): ContactSuivi {
     position: 1,
     suivante: "premier-echange",
     relanceLe: null,
+    retardRelance: null,
     dernierEchangeLe: null,
     note: null,
     joursDepuisDernierEchange: null,
@@ -37,16 +39,44 @@ export function contactSuivi(champs: Partial<ContactSuivi> = {}): ContactSuivi {
   };
 }
 
+/** Claire en « Démo planifiée », tiède, étape 3 sur 5. */
+export function enDemo(champs: Partial<ContactSuivi> = {}): ContactSuivi {
+  return contactSuivi({
+    etape: "demo",
+    temperature: "tiede",
+    position: 3,
+    suivante: "proposition",
+    ...champs,
+  });
+}
+
 /** Contact de « À relancer aujourd'hui » : par défaut, relance due aujourd'hui (18 novembre). */
 export function contactARelancer(champs: Partial<ContactARelancer> = {}): ContactARelancer {
-  return { ...contactSuivi({ relanceLe: "2026-11-18" }), retard: 0, ...champs };
+  return { ...contactSuivi({ relanceLe: "2026-11-18", retardRelance: 0 }), retard: 0, ...champs };
+}
+
+/** Colonnes telles que `tableau()` les renvoie : chaque contact dans la colonne de son étape. */
+export function colonnes(contacts: ContactSuivi[]): ColonneDuTableau[] {
+  return etapes.map((etape) => ({
+    ...etape,
+    contacts: contacts.filter((contact) => contact.etape === etape.code),
+  }));
 }
 
 export const actionsInertes: ActionsContact = {
-  avancer: async () => {},
   changerEtape: async () => {},
   planifierRelance: async () => ({}),
   retirerRelance: async () => {},
   modifier: async () => ({}),
   supprimer: async () => {},
 };
+
+/**
+ * Trouve l'élément le plus profond dont le texte complet vaut `texte`,
+ * même quand une partie est réservée aux lecteurs d'écran (`sr-only`).
+ */
+export function parTexte(texte: string) {
+  return (_contenu: string, element: Element | null) =>
+    element?.textContent === texte &&
+    !Array.from(element.children).some((enfant) => enfant.textContent === texte);
+}

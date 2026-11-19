@@ -29,6 +29,8 @@ Lot 5 livré : « Marquer comme relancé » dans « À relancer aujourd’hui »
 
 Lot 6 livré : depuis la carte, « Modifier » ouvre la fiche (`FicheContact` : nom, entreprise, fonction, e-mail, téléphone) et « Supprimer » demande une confirmation dans la carte, sans boîte de dialogue. Le service valide le nom et la forme de l'e-mail (`modifier`). Le formulaire est en `noValidate` pour que ce soit le message du service qui s'affiche.
 
+Lot 7 livré : l'accueil est un tableau de cinq colonnes (`TableauContacts`, service `tableau()`, qui trie les relances dues d'abord puis du plus récent au plus ancien). Le glisser-déposer passe par `@dnd-kit/core` (souris, appui long au doigt) ; au clavier, Maj + flèche sur le nom de la carte. La carte en main se lit dans `useDndContext()`, jamais dans un état à part : un geste plus rapide qu'un rendu se termine sans `onDragEnd`. Le déplacement s'affiche tout de suite (`useOptimistic`), le rafraîchissement rétablit l'ordre du service. Un clic sur la carte ouvre `FicheTiroir` (Sheet) : piste cliquable, relance, dernier échange, coordonnées, modification, suppression. `ContactSuivi.retardRelance` dit si la relance est en retard (> 0), du jour (0) ou à venir (< 0). « À relancer aujourd'hui » est sur `/aujourdhui` ; la barre (`BarreApp`, chargée par `src/app/barre.tsx`) affiche le nombre de relances dues. Jetons ajoutés : `colonne` et `bord-fort`.
+
 Le découpage en lots, avec les critères d'acceptation et le statut de chaque lot, est dans `LOTS.md`.
 
 ## Organisation des couches

@@ -21,6 +21,16 @@ export interface ContactSuivi extends Contact {
   suivante: Etape | null;
   /** Jours écoulés depuis le dernier échange : 0 s'il a eu lieu aujourd'hui. */
   joursDepuisDernierEchange: number | null;
+  /**
+   * Jours écoulés depuis la date de relance : positif en retard, 0 aujourd'hui,
+   * négatif à venir, `null` sans relance.
+   */
+  retardRelance: number | null;
+}
+
+/** Une colonne du tableau : une étape et ses contacts, dans l'ordre d'affichage. */
+export interface ColonneDuTableau extends EtapeDuParcours {
+  contacts: ContactSuivi[];
 }
 
 /** Un contact de « À relancer aujourd'hui ». */
@@ -108,7 +118,24 @@ function suivre(contact: Contact, jour: string): ContactSuivi {
     suivante: ETAPES[rang + 1]?.code ?? null,
     joursDepuisDernierEchange:
       contact.dernierEchangeLe === null ? null : joursEntre(contact.dernierEchangeLe, jour),
+    retardRelance: contact.relanceLe === null ? null : joursEntre(contact.relanceLe, jour),
   };
+}
+
+function estDue(contact: ContactSuivi): boolean {
+  return contact.retardRelance !== null && contact.retardRelance >= 0;
+}
+
+/**
+ * Ordre d'une colonne du tableau : les relances dues d'abord, la plus en retard en tête,
+ * puis les autres contacts, du plus récent au plus ancien.
+ */
+function ordreDuTableau(a: ContactSuivi, b: ContactSuivi): number {
+  if (estDue(a) !== estDue(b)) return estDue(a) ? -1 : 1;
+  if (estDue(a) && a.retardRelance !== b.retardRelance) {
+    return (b.retardRelance ?? 0) - (a.retardRelance ?? 0);
+  }
+  return b.creeLe.getTime() - a.creeLe.getTime();
 }
 
 const CONTACT_INCONNU = { ok: false, erreur: "Ce contact n'existe plus." } as const;
@@ -231,6 +258,18 @@ export function createContactService({
       return tous
         .toSorted((a, b) => b.creeLe.getTime() - a.creeLe.getTime())
         .map((contact) => suivre(contact, jour));
+    },
+
+    /** Les cinq étapes dans l'ordre, chacune avec ses contacts dans l'ordre de la colonne. */
+    async tableau(): Promise<ColonneDuTableau[]> {
+      const jour = aujourdhui();
+      const suivis = (await contacts.lister())
+        .map((contact) => suivre(contact, jour))
+        .toSorted(ordreDuTableau);
+      return ETAPES.map((etape) => ({
+        ...etape,
+        contacts: suivis.filter((contact) => contact.etape === etape.code),
+      }));
     },
 
     /** Les étapes dans l'ordre, pour la liste des étapes et la piste. */

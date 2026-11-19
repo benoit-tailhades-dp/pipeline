@@ -20,7 +20,7 @@ Fichiers : `src/app/` (routes, Server Components, Server Actions) et `src/compon
 
 - Composants : uniquement ceux de `src/components/ui/` (Button, Input, Label, Select, Card, Badge…). Pas de `<button>`, `<input>`, `<select>` ni `<textarea>` natifs hors de `src/components/ui/`.
 - S'il manque un composant : `pnpm dlx shadcn@latest add <composant>`, l'adapter au design (voir CLAUDE.md), puis l'ajouter à `/design-system`.
-- Couleurs : uniquement les tokens `background`, `foreground`, `card`, `popover`, `primary`, `secondary`, `muted`, `accent`, `destructive`, `border`, `input`, `ring`, `froid`, `tiede` et `chaud`, avec une opacité si besoin (`bg-tiede/15`).
+- Couleurs : uniquement les tokens `background`, `foreground`, `card`, `popover`, `primary`, `secondary`, `muted`, `accent`, `destructive`, `border`, `input`, `ring`, `froid`, `tiede`, `chaud`, `colonne` et `bord-fort`, avec une opacité si besoin (`bg-tiede/15`).
 - Sont interdits : les codes hex, `rgb()`, `hsl()`, `oklch()`, la palette Tailwind (`bg-green-600`, `text-zinc-500`, `bg-white`), les valeurs arbitraires (`text-[#1E6B52]`) et `style={{ color }}`.
 - Écrire les classes Tailwind en entier, sans les construire dynamiquement (`bg-${couleur}`), sinon Tailwind ne les génère pas.
 - Base UI, pas Radix : on compose avec la prop `render`, pas avec `asChild`.
