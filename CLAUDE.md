@@ -33,6 +33,8 @@ Lot 7 livré : l'accueil est un tableau de cinq colonnes (`TableauContacts`, ser
 
 Lot 8 livré : le service propose les dates rapides (`datesRapides()` : demain, 3 jours, 1 semaine, 2 semaines, avec `ajouterJours`) et la progression du jour (`progressionDuJour()` : échanges enregistrés aujourd'hui sur relances du jour). `DatesRapides` sert à trois endroits : dans la fiche, un clic planifie ; dans `MarquerRelance`, il remplit la relance suivante ; sur « Aujourd'hui », derrière « Reporter » (`ReporterRelance`). La fiche permet de marquer comme relancé un contact dont la relance est due. `ProgressionDuJour` est une piste à un segment par relance (pas de largeur dynamique).
 
+Lot 9 livré : `FournisseurToasts` (dans le layout) affiche un message à la fois avec « Annuler » : après un déplacement (retour à l'étape d'avant), un marquage (`annulerMarquage` rétablit relance, note et dernier échange ; `Echange.dernierEchangeLe` accepte `null`) et une modification de la fiche. Une boîte modale rend le reste de la page inerte : la fiche contient `ZoneToasts`, où le message s'affiche tant qu'elle est ouverte. La recherche vit dans l'adresse (`/?q=`, `ChampRecherche`) et c'est `tableau(recherche)` qui filtre (nom, entreprise, fonction, note, sans accents ni majuscules). Raccourcis : N ouvre l'ajout, / la recherche, Échap ferme la fiche (Base UI).
+
 Le découpage en lots, avec les critères d'acceptation et le statut de chaque lot, est dans `LOTS.md`.
 
 ## Organisation des couches
@@ -47,7 +49,7 @@ Le découpage en lots, avec les critères d'acceptation et le statut de chaque l
 ## Tests
 
 - Vitest 5 avec deux projets (`vitest.config.mts`) : `node` pour tout `src/` hors présentation, `jsdom` pour `src/app/**` et `src/components/**`. Les fichiers de test (`*.test.ts(x)`) sont dans un dossier `__test__` placé à côté du code testé.
-- Données : tester contre `createDb(":memory:")`. Service : passer un faux repository qui implémente l'interface. Présentation : Testing Library, uniquement sur des composants synchrones (Vitest ne gère pas les Server Components async).
+- Données : tester contre `createDb(":memory:")`. Service : passer un faux repository qui implémente l'interface. Présentation : Testing Library, uniquement sur des composants synchrones (Vitest ne gère pas les Server Components async). Un composant qui appelle `useRouter` se teste avec `vi.mock("next/navigation")` (voir `champ-recherche.test.tsx`) ; un glisser-déposer, en posant la géométrie avec un faux `getBoundingClientRect` (voir `tableau-contacts.test.tsx`).
 - Les chemins `@/*` sont résolus nativement par Vite 8 (`resolve.tsconfigPaths`) : pas besoin de `vite-tsconfig-paths`.
 
 ## Particularités de la stack

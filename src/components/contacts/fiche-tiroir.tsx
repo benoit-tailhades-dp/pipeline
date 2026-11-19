@@ -12,6 +12,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { useToast, ZoneToasts } from "@/components/toasts";
 import { cn } from "@/lib/utils";
 import type {
   ContactSuivi,
@@ -22,7 +23,7 @@ import type {
 
 import type { ActionsContact } from "./actions-contact";
 import { formaterDateCourte } from "./dates";
-import { FicheContact } from "./fiche-contact";
+import { FicheContact, type ValeursFiche } from "./fiche-contact";
 import { MarquerRelance } from "./marquer-relance";
 import { RelanceContact } from "./relance-contact";
 import { Avatar, LIBELLES_ETAPES, Pastille, TEMPERATURES } from "./temperature";
@@ -163,14 +164,26 @@ function ConfirmationSuppression({
 }
 
 /** Relance due : la fiche permet de l'enregistrer comme faite. */
+function valeursDe(contact: ContactSuivi): ValeursFiche {
+  return {
+    nom: contact.nom,
+    entreprise: contact.entreprise ?? "",
+    fonction: contact.fonction ?? "",
+    email: contact.email ?? "",
+    telephone: contact.telephone ?? "",
+  };
+}
+
 function RelanceDue({
   contact,
   datesRapides,
   marquerAction,
+  annulerAction,
 }: {
   contact: ContactSuivi;
   datesRapides: readonly DateRapide[];
   marquerAction: ActionsContact["marquer"];
+  annulerAction: ActionsContact["annulerMarquage"];
 }) {
   const retard = contact.retardRelance ?? 0;
   return (
@@ -180,7 +193,17 @@ function RelanceDue({
           ? `En retard de ${retard} ${retard > 1 ? "jours" : "jour"}`
           : "À relancer aujourd’hui"}
       </p>
-      <MarquerRelance id={contact.id} marquerAction={marquerAction} datesRapides={datesRapides} />
+      <MarquerRelance
+        id={contact.id}
+        marquerAction={marquerAction}
+        datesRapides={datesRapides}
+        precedent={{
+          dernierEchangeLe: contact.dernierEchangeLe,
+          note: contact.note,
+          relanceLe: contact.relanceLe,
+        }}
+        annulerAction={annulerAction}
+      />
     </div>
   );
 }
@@ -200,6 +223,9 @@ function ContenuFiche({
 }) {
   const due = contact.retardRelance !== null && contact.retardRelance >= 0;
   const [mode, setMode] = useState<"suivi" | "fiche" | "suppression">("suivi");
+  // Valeurs d'avant la modification, gardées dès l'ouverture du formulaire pour « Annuler ».
+  const [avant, setAvant] = useState<ValeursFiche | null>(null);
+  const afficherToast = useToast();
   const sousTitre = [contact.fonction, contact.entreprise].filter(Boolean).join(", ");
 
   return (
@@ -241,6 +267,7 @@ function ContenuFiche({
               contact={contact}
               datesRapides={datesRapides}
               marquerAction={actions.marquer}
+              annulerAction={actions.annulerMarquage}
             />
           )}
           <RelanceContact
@@ -259,7 +286,14 @@ function ContenuFiche({
           titre="Coordonnées"
           action={
             mode !== "fiche" && (
-              <Button variant="ghost" size="sm" onClick={() => setMode("fiche")}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setAvant(valeursDe(contact));
+                  setMode("fiche");
+                }}
+              >
                 <PencilIcon data-icon="inline-start" />
                 Modifier
               </Button>
@@ -270,7 +304,10 @@ function ContenuFiche({
             <FicheContact
               contact={contact}
               modifierAction={actions.modifier}
-              onEnregistre={() => setMode("suivi")}
+              onEnregistre={() => {
+                setMode("suivi");
+                if (avant) afficherToast("Fiche enregistrée.", () => actions.modifier(contact.id, avant));
+              }}
               onAnnule={() => setMode("suivi")}
             />
           ) : (
@@ -338,6 +375,7 @@ export function FicheTiroir({
             actions={actions}
             deplacer={deplacer}
           />
+          <ZoneToasts />
         </SheetContent>
       )}
     </Sheet>

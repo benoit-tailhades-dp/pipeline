@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Figtree, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
+
+import { FournisseurToasts } from "@/components/toasts";
 import "./globals.css";
 
 const figtree = Figtree({
@@ -28,7 +30,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full flex flex-col">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          {children}
+          <FournisseurToasts>{children}</FournisseurToasts>
         </ThemeProvider>
       </body>
     </html>

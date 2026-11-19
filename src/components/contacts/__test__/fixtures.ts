@@ -75,6 +75,7 @@ export const datesRapides: DateRapide[] = [
 export const actionsInertes: ActionsContact = {
   changerEtape: async () => {},
   marquer: async () => ({}),
+  annulerMarquage: async () => {},
   planifierRelance: async () => ({}),
   retirerRelance: async () => {},
   modifier: async () => ({}),

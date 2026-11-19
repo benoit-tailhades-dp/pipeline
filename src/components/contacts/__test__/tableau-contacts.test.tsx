@@ -1,8 +1,10 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { Input } from "@/components/ui/input";
 import type { ContactSuivi } from "@/services/contact-service";
 
+import { FournisseurToasts } from "../../toasts";
 import type { ActionsContact } from "../actions-contact";
 import { TableauContacts } from "../tableau-contacts";
 import { actionsInertes, colonnes, contactSuivi, enDemo, parTexte } from "./fixtures";
@@ -27,12 +29,26 @@ const paul = contactSuivi({
 
 function afficher(contacts: ContactSuivi[], actions: Partial<ActionsContact> = {}) {
   return render(
-    <TableauContacts
-      colonnes={colonnes(contacts)}
-      actions={{ ...actionsInertes, ...actions }}
-      ajouterAction={async () => ({})}
-    />,
+    <FournisseurToasts>
+      <TableauContacts
+        colonnes={colonnes(contacts)}
+        actions={{ ...actionsInertes, ...actions }}
+        ajouterAction={async () => ({})}
+        recherche={<Input id="recherche" aria-label="Rechercher un contact" />}
+      />
+    </FournisseurToasts>,
   );
+}
+
+/** Glisse la carte de Claire, en « Démo planifiée », dans « Proposition envoyée ». */
+async function glisserClaireEnProposition() {
+  const carte = screen.getByRole("heading", { name: "Claire Vasseur" }).closest("article")!;
+  fireEvent.mouseDown(carte, { button: 0, clientX: 650, clientY: 100 });
+  fireEvent.mouseMove(document, { clientX: 660, clientY: 100 });
+  fireEvent.mouseMove(document, { clientX: 950, clientY: 300 });
+  await act(async () => {
+    fireEvent.mouseUp(document, { clientX: 950, clientY: 300 });
+  });
 }
 
 function colonne(nom: string) {
@@ -152,6 +168,23 @@ describe("TableauContacts", () => {
     expect(enAttenteDeDepot).toEqual([]);
   });
 
+  it("ramène la carte dans sa colonne quand j'annule le déplacement", async () => {
+    poserLesColonnes();
+    const changerEtape = vi.fn(async () => {});
+    afficher([enDemo()], { changerEtape });
+
+    await glisserClaireEnProposition();
+    screen.getByText("Claire Vasseur passe à « Proposition envoyée ».");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Annuler" }));
+    });
+
+    expect(changerEtape.mock.calls).toEqual([
+      [7, "proposition"],
+      [7, "demo"],
+    ]);
+  });
+
   it("ne change rien quand je lâche la carte dans sa propre colonne", async () => {
     poserLesColonnes();
     const changerEtape = vi.fn(async () => {});
@@ -221,6 +254,55 @@ describe("TableauContacts", () => {
 
     const fiche = await screen.findByRole("dialog", { name: "Claire Vasseur" });
     within(fiche).getByText("Responsable PLM, Ateliers Vernier");
+  });
+
+  it("ferme la fiche avec Échap", async () => {
+    afficher([enDemo()]);
+    fireEvent.click(screen.getByRole("button", { name: "Claire Vasseur" }));
+    const fiche = await screen.findByRole("dialog", { name: "Claire Vasseur" });
+
+    fireEvent.keyDown(fiche, { key: "Escape" });
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("ouvre le formulaire d'ajout avec la touche N", () => {
+    afficher([marc]);
+
+    fireEvent.keyDown(document.body, { key: "n" });
+
+    within(colonne("À contacter")).getByLabelText("Nom");
+  });
+
+  it("place le curseur dans la recherche avec la touche /", () => {
+    afficher([marc]);
+
+    fireEvent.keyDown(document.body, { key: "/" });
+
+    expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Rechercher un contact" }));
+  });
+
+  it("n'intercepte pas N pendant une saisie", () => {
+    afficher([marc]);
+    const recherche = screen.getByRole("textbox", { name: "Rechercher un contact" });
+
+    fireEvent.keyDown(recherche, { key: "n" });
+
+    expect(screen.queryByLabelText("Nom")).toBeNull();
+  });
+
+  it("annonce une recherche sans résultat dans les colonnes vides", () => {
+    render(
+      <TableauContacts
+        colonnes={colonnes([])}
+        actions={actionsInertes}
+        ajouterAction={async () => ({})}
+        filtre="zzz"
+      />,
+    );
+
+    within(colonne("Démo planifiée")).getByText("Aucun résultat.");
+    screen.getByText("0 contact pour « zzz »");
   });
 
   it("ouvre le formulaire d'ajout en tête de « À contacter »", () => {

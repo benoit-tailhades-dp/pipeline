@@ -115,7 +115,7 @@ Statut : livré
 
 ## Lot 9 : Annuler et aller vite
 
-Statut : à faire
+Statut : livré
 
 **Parcours.** Après un déplacement, une relance ou une modification, un message me propose « Annuler ». Une recherche filtre le tableau. Des raccourcis clavier accélèrent l'ajout et la recherche.
 

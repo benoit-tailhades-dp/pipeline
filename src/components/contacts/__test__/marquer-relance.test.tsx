@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
+import { FournisseurToasts } from "../../toasts";
 import { MarquerRelance, type EtatMarquage, type SaisieMarquage } from "../marquer-relance";
 import { datesRapides } from "./fixtures";
 
@@ -13,6 +14,27 @@ function marquer() {
 }
 
 describe("MarquerRelance", () => {
+  it("propose d'annuler le marquage, en rendant l'état d'avant", async () => {
+    const annuler = vi.fn(async () => {});
+    const precedent = { dernierEchangeLe: "2026-11-04", note: "Ancienne note", relanceLe: "2026-11-18" };
+    render(
+      <FournisseurToasts>
+        <MarquerRelance
+          id={7}
+          marquerAction={async () => ({})}
+          precedent={precedent}
+          annulerAction={annuler}
+        />
+      </FournisseurToasts>,
+    );
+
+    marquer();
+    await screen.findByText("Échange enregistré.");
+    fireEvent.click(screen.getByRole("button", { name: "Annuler" }));
+
+    expect(annuler).toHaveBeenCalledExactlyOnceWith(7, precedent);
+  });
+
   it("remplit la relance suivante au 25 novembre quand je choisis « Dans 1 semaine »", async () => {
     const action = vi.fn(async () => ({}));
     afficher(action);

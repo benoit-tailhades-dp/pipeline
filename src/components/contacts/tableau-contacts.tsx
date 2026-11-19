@@ -15,10 +15,11 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { PlusIcon } from "lucide-react";
-import { startTransition, useId, useOptimistic, useRef, useState } from "react";
+import { startTransition, useEffect, useId, useOptimistic, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/toasts";
 import { cn } from "@/lib/utils";
 import type {
   ColonneDuTableau,
@@ -31,6 +32,7 @@ import type { ActionsContact } from "./actions-contact";
 import { CarteContact } from "./carte-contact";
 import { FicheTiroir } from "./fiche-tiroir";
 import { FormulaireContact, type ActionFormulaireContact } from "./formulaire-contact";
+import { ID_RECHERCHE } from "./recherche";
 import { LIBELLES_ETAPES, MiniPiste, TEMPERATURES } from "./temperature";
 
 interface Deplacement {
@@ -162,6 +164,7 @@ function Colonne({
   formulaire,
   onAjouter,
   aucunContact,
+  filtre,
   ...rappels
 }: {
   colonne: ColonneDuTableau;
@@ -170,6 +173,8 @@ function Colonne({
   enMain: ContactSuivi | null;
   /** Le tableau entier est vide : la première colonne invite au premier ajout. */
   aucunContact: boolean;
+  /** Recherche en cours : une colonne vide l'est faute de résultat. */
+  filtre: string;
   /** Le formulaire d'ajout, affiché en tête de la première colonne. */
   formulaire: React.ReactNode;
   onAjouter?: () => void;
@@ -211,9 +216,11 @@ function Colonne({
         ))}
         {nombre === 0 && !formulaire && !visee && (
           <p className="grid min-h-20 place-items-center rounded-xl border-2 border-dashed border-bord-fort p-3 text-center text-sm text-muted-foreground">
-            {onAjouter && aucunContact
-              ? "Aucun contact pour l’instant. Ajoutez votre premier contact."
-              : "Glissez une carte ici."}
+            {filtre
+              ? "Aucun résultat."
+              : onAjouter && aucunContact
+                ? "Aucun contact pour l’instant. Ajoutez votre premier contact."
+                : "Glissez une carte ici."}
           </p>
         )}
       </div>
@@ -230,11 +237,13 @@ function Plateau({
   colonnes,
   formulaire,
   onAjouter,
+  filtre,
   rappels,
 }: {
   colonnes: ColonneDuTableau[];
   formulaire: React.ReactNode;
   onAjouter: () => void;
+  filtre: string;
   rappels: RappelsCarte;
 }) {
   const { active } = useDndContext();
@@ -253,6 +262,7 @@ function Plateau({
             colonnes={colonnes}
             enMain={enMain}
             aucunContact={total === 0}
+            filtre={filtre}
             formulaire={rang === 0 && formulaire}
             onAjouter={rang === 0 ? onAjouter : undefined}
             {...rappels}
@@ -283,11 +293,17 @@ export function TableauContacts({
   actions,
   ajouterAction,
   datesRapides = [],
+  recherche,
+  filtre = "",
 }: {
   colonnes: ColonneDuTableau[];
   actions: ActionsContact;
   ajouterAction: ActionFormulaireContact;
   datesRapides?: readonly DateRapide[];
+  /** Le champ de recherche, fourni par la page. */
+  recherche?: React.ReactNode;
+  /** La recherche appliquée par le service aux colonnes reçues. */
+  filtre?: string;
 }) {
   const [affichees, deplacerOptimiste] = useOptimistic(colonnes, deplacerDans);
   const [formulaire, setFormulaire] = useState(false);
@@ -300,12 +316,57 @@ export function TableauContacts({
   const etapes = affichees.map(({ code, temperature }) => ({ code, temperature }));
   const total = affichees.reduce((somme, colonne) => somme + colonne.contacts.length, 0);
 
-  function deplacer(id: number, etape: Etape) {
+  const afficherToast = useToast();
+  const ficheOuverte = fiche?.ouverte ?? false;
+
+  function appliquer(id: number, etape: Etape) {
     startTransition(async () => {
       deplacerOptimiste({ id, etape });
       await actions.changerEtape(id, etape);
     });
   }
+
+  /** Change l'étape tout de suite, et propose d'annuler. */
+  function deplacer(id: number, etape: Etape) {
+    const contact = trouver(affichees, id);
+    if (!contact || contact.etape === etape) return;
+    const depuis = contact.etape;
+    appliquer(id, etape);
+    afficherToast(
+      etape === "gagne"
+        ? `Signé avec ${contact.entreprise ?? contact.nom}.`
+        : `${contact.nom} passe à « ${LIBELLES_ETAPES[etape]} ».`,
+      () => appliquer(id, depuis),
+    );
+  }
+
+  // Raccourcis : N ouvre le formulaire d'ajout, / va dans la recherche. Pas pendant une saisie.
+  useEffect(() => {
+    function auClavier(event: KeyboardEvent) {
+      if (ficheOuverte || event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) {
+        return;
+      }
+      const cible = event.target;
+      if (
+        cible instanceof HTMLElement &&
+        cible.closest("input, textarea, select, [contenteditable='true']")
+      ) {
+        return;
+      }
+      if (event.key === "n" || event.key === "N") {
+        event.preventDefault();
+        setFormulaire(true);
+      } else if (event.key === "/") {
+        const champ = document.getElementById(ID_RECHERCHE);
+        if (champ) {
+          event.preventDefault();
+          champ.focus();
+        }
+      }
+    }
+    document.addEventListener("keydown", auClavier);
+    return () => document.removeEventListener("keydown", auClavier);
+  }, [ficheOuverte]);
 
   const rappels: RappelsCarte = {
     onOuvrir(id) {
@@ -336,13 +397,16 @@ export function TableauContacts({
         <div className="grid gap-0.5">
           <h1 className="text-2xl font-bold tracking-tight">Pipeline</h1>
           <p className="text-sm text-muted-foreground">
-            {total} {total > 1 ? "contacts" : "contact"}
+            {`${total} ${total > 1 ? "contacts" : "contact"}${filtre ? ` pour « ${filtre} »` : ""}`}
           </p>
         </div>
-        <Button onClick={() => setFormulaire(true)}>
-          <PlusIcon data-icon="inline-start" />
-          Nouveau contact
-        </Button>
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          {recherche}
+          <Button aria-keyshortcuts="N" onClick={() => setFormulaire(true)}>
+            <PlusIcon data-icon="inline-start" />
+            Nouveau contact
+          </Button>
+        </div>
       </div>
 
       <DndContext
@@ -359,6 +423,7 @@ export function TableauContacts({
             )
           }
           onAjouter={() => setFormulaire(true)}
+          filtre={filtre}
           rappels={rappels}
         />
       </DndContext>

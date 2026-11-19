@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 import { Suspense } from "react";
 
-import { marquerRelance, planifierRelance } from "@/app/actions";
+import { annulerMarquage, marquerRelance, planifierRelance } from "@/app/actions";
 import { Barre } from "@/app/barre";
 import { ListeARelancer } from "@/components/contacts/liste-a-relancer";
 import { ProgressionDuJour } from "@/components/contacts/progression-du-jour";
@@ -27,6 +27,7 @@ async function RelancesDuJour() {
         marquerAction={marquerRelance}
         planifierAction={planifierRelance}
         datesRapides={service.datesRapides()}
+        annulerAction={annulerMarquage}
       />
     </>
   );

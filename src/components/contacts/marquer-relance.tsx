@@ -5,7 +5,8 @@ import { useActionState, useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { DateRapide, ErreursEchange } from "@/services/contact-service";
+import { useToast } from "@/components/toasts";
+import type { DateRapide, ErreursEchange, EtatEchange } from "@/services/contact-service";
 
 import { DatesRapides } from "./dates-rapides";
 
@@ -28,21 +29,34 @@ export function MarquerRelance({
   id,
   marquerAction,
   datesRapides = [],
+  precedent,
+  annulerAction,
 }: {
   id: number;
   marquerAction: (id: number, saisie: SaisieMarquage) => Promise<EtatMarquage>;
   /** Dates proposées par le service : un clic remplit la relance suivante. */
   datesRapides?: readonly DateRapide[];
+  /** L'état d'avant le marquage, que « Annuler » rétablit. */
+  precedent?: EtatEchange;
+  annulerAction?: (id: number, precedent: EtatEchange) => Promise<void>;
 }) {
+  const afficherToast = useToast();
   // La relance suivante est contrôlée : les dates rapides la remplissent.
   const [prochaine, setProchaine] = useState("");
   const [etat, envoyer, enCours] = useActionState(
     async (_etat: EtatMarquage, formData: FormData) => {
+      const avant = precedent;
       const resultat = await marquerAction(id, {
         note: texte(formData.get("note")),
         prochaineRelance: texte(formData.get("prochaine-relance")),
       });
-      if (!resultat.erreurs) setProchaine("");
+      if (!resultat.erreurs) {
+        setProchaine("");
+        afficherToast(
+          "Échange enregistré.",
+          avant && annulerAction ? () => annulerAction(id, avant) : undefined,
+        );
+      }
       return resultat;
     },
     {},

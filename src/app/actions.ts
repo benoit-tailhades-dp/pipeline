@@ -6,6 +6,7 @@ import type { EtatFormulaireContact } from "@/components/contacts/formulaire-con
 import type { EtatFiche, ValeursFiche } from "@/components/contacts/fiche-contact";
 import type { EtatMarquage, SaisieMarquage } from "@/components/contacts/marquer-relance";
 import type { EtatRelance } from "@/components/contacts/relance-contact";
+import type { EtatEchange } from "@/services/contact-service";
 import { contactService } from "@/server/container";
 
 function texte(valeur: FormDataEntryValue | null): string {
@@ -49,6 +50,11 @@ export async function marquerRelance(id: number, saisie: SaisieMarquage): Promis
   if (!resultat.ok) return { erreurs: resultat.erreurs, valeurs: saisie };
   refresh();
   return {};
+}
+
+export async function annulerMarquage(id: number, precedent: EtatEchange): Promise<void> {
+  await (await contactService()).annulerMarquage(id, precedent);
+  refresh();
 }
 
 export async function modifierContact(id: number, valeurs: ValeursFiche): Promise<EtatFiche> {

@@ -5,6 +5,7 @@ import { useState } from "react";
 import { CarteContact } from "@/components/contacts/carte-contact";
 import { DatesRapides } from "@/components/contacts/dates-rapides";
 import { ProgressionDuJour } from "@/components/contacts/progression-du-jour";
+import { useToast } from "@/components/toasts";
 import { EnTeteColonne } from "@/components/contacts/tableau-contacts";
 import { Button } from "@/components/ui/button";
 import {
@@ -196,6 +197,22 @@ export function ExemplesGlisser() {
         </figcaption>
       </figure>
     </div>
+  );
+}
+
+export function ExempleToast() {
+  const afficherToast = useToast();
+  return (
+    <Button
+      variant="outline"
+      onClick={() =>
+        afficherToast("Claire Vasseur passe à « Proposition envoyée ».", () =>
+          afficherToast("Déplacement annulé."),
+        )
+      }
+    >
+      Afficher un toast
+    </Button>
   );
 }
 

@@ -16,6 +16,7 @@ import { ThemeSwitch } from "@/components/theme-switch";
 import { cn } from "@/lib/utils";
 
 import {
+  ExempleToast,
   ExempleTiroir,
   ExemplesCartes,
   ExemplesGlisser,
@@ -301,6 +302,13 @@ export default function DesignSystem() {
         description="Dates rapides et progression du jour, dans la fiche et sur la page « Aujourd’hui »."
       >
         <ExemplesRelance />
+      </Section>
+
+      <Section
+        titre="Toast"
+        description="Un message à la fois, en bas de l’écran, en couleurs inversées. « Annuler » défait l’action ; le message disparaît seul après 6 secondes. Dans une boîte modale, il s’affiche dans la boîte (ZoneToasts) pour rester cliquable."
+      >
+        <ExempleToast />
       </Section>
 
       <Section

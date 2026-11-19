@@ -7,7 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import type { ContactARelancer, DateRapide } from "@/services/contact-service";
+import type { ContactARelancer, DateRapide, EtatEchange } from "@/services/contact-service";
 
 import { MarquerRelance, type EtatMarquage, type SaisieMarquage } from "./marquer-relance";
 import type { EtatRelance } from "./relance-contact";
@@ -22,12 +22,15 @@ export function ListeARelancer({
   marquerAction,
   planifierAction,
   datesRapides = [],
+  annulerAction,
 }: {
   contacts: ContactARelancer[];
   marquerAction: (id: number, saisie: SaisieMarquage) => Promise<EtatMarquage>;
   /** Pour « Reporter » : planifie la relance à une date rapide. */
   planifierAction?: (id: number, date: string) => Promise<EtatRelance>;
   datesRapides?: readonly DateRapide[];
+  /** Pour « Annuler » après un marquage : rétablit l'état d'avant. */
+  annulerAction?: (id: number, precedent: EtatEchange) => Promise<void>;
 }) {
   if (contacts.length === 0) {
     return <p className="text-sm text-muted-foreground">Personne à relancer aujourd’hui.</p>;
@@ -60,6 +63,12 @@ export function ListeARelancer({
                 id={contact.id}
                 marquerAction={marquerAction}
                 datesRapides={datesRapides}
+                precedent={{
+                  dernierEchangeLe: contact.dernierEchangeLe,
+                  note: contact.note,
+                  relanceLe: contact.relanceLe,
+                }}
+                annulerAction={annulerAction}
               />
               {planifierAction && datesRapides.length > 0 && (
                 <ReporterRelance

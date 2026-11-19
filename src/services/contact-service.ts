@@ -43,6 +43,13 @@ export interface DateRapide {
 }
 
 /** Les relances du jour : celles déjà faites (un échange enregistré aujourd'hui) sur le total. */
+/** Ce qu'un marquage modifie : de quoi revenir en arrière. */
+export interface EtatEchange {
+  dernierEchangeLe: string | null;
+  note: string | null;
+  relanceLe: string | null;
+}
+
 export interface ProgressionDuJour {
   faites: number;
   total: number;
@@ -161,6 +168,7 @@ const EMAIL_INVALIDE = "Cette adresse e-mail n'est pas valide.";
 const FORME_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const DATE_MANQUANTE = "Indiquez une date de relance.";
+const ETAT_PRECEDENT_INVALIDE = "Impossible d'annuler : l'état précédent n'est pas valide.";
 const PAS_UN_TEXTE = "Ce champ doit contenir du texte.";
 const LONGUEUR_MAX = 200;
 const LONGUEUR_MAX_NOTE = 2000;
@@ -225,6 +233,25 @@ function lireIdentite<C extends Exclude<ChampTexte, "nom" | "note">>(
   return { valeurs, erreurs };
 }
 
+/** Une date AAAA-MM-JJ ou `null` ; toute autre valeur est refusée. */
+function lireDateOuNull(valeur: unknown): { ok: true; date: string | null } | { ok: false } {
+  if (valeur === null) return { ok: true, date: null };
+  if (typeof valeur === "string" && estUneDate(valeur)) return { ok: true, date: valeur };
+  return { ok: false };
+}
+
+/** Sans accents ni majuscules, pour comparer une recherche à un texte. */
+function normaliser(texte: string): string {
+  return texte.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+function correspond(contact: Contact, filtre: string): boolean {
+  const texte = [contact.nom, contact.entreprise, contact.fonction, contact.note]
+    .filter((partie) => partie !== null)
+    .join(" ");
+  return normaliser(texte).includes(filtre);
+}
+
 function aDesErreurs(erreurs: object): boolean {
   return Object.keys(erreurs).length > 0;
 }
@@ -282,10 +309,16 @@ export function createContactService({
         .map((contact) => suivre(contact, jour));
     },
 
-    /** Les cinq étapes dans l'ordre, chacune avec ses contacts dans l'ordre de la colonne. */
-    async tableau(): Promise<ColonneDuTableau[]> {
+    /**
+     * Les cinq étapes dans l'ordre, chacune avec ses contacts dans l'ordre de la colonne.
+     * Une recherche ne garde que les contacts dont le nom, l'entreprise, la fonction ou la note
+     * la contient, sans tenir compte des accents ni des majuscules.
+     */
+    async tableau(recherche?: string): Promise<ColonneDuTableau[]> {
       const jour = aujourdhui();
+      const filtre = typeof recherche === "string" ? normaliser(recherche.trim()) : "";
       const suivis = (await contacts.lister())
+        .filter((contact) => filtre === "" || correspond(contact, filtre))
         .map((contact) => suivre(contact, jour))
         .toSorted(ordreDuTableau);
       return ETAPES.map((etape) => ({
@@ -403,6 +436,25 @@ export function createContactService({
       const contact = await contacts.modifier(id, { ...valeurs, nom: valeurs.nom });
       if (!contact) return { ok: false, erreurs: { contact: CONTACT_INCONNU.erreur } };
       return { ok: true, contact: suivre(contact, aujourdhui()) };
+    },
+
+    /** Remet la relance, la note et le dernier échange tels qu'ils étaient avant un marquage. */
+    async annulerMarquage(id: number, precedent: EtatEchange): Promise<ResultatContact> {
+      if (typeof precedent !== "object" || precedent === null) {
+        return { ok: false, erreur: ETAT_PRECEDENT_INVALIDE };
+      }
+      const source = enObjet(precedent);
+      const echange = lireDateOuNull(source.dernierEchangeLe);
+      const relance = lireDateOuNull(source.relanceLe);
+      const note = lireTexte(source.note, "note", LONGUEUR_MAX_NOTE);
+      if (!echange.ok || !relance.ok || !note.ok) return { ok: false, erreur: ETAT_PRECEDENT_INVALIDE };
+      return resultat(
+        await contacts.enregistrerEchange(id, {
+          dernierEchangeLe: echange.date,
+          note: note.texte,
+          relanceLe: relance.date,
+        }),
+      );
     },
 
     async supprimer(id: number): Promise<{ ok: true } | { ok: false; erreur: string }> {

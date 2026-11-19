@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { ContactSuivi } from "@/services/contact-service";
 
+import { FournisseurToasts } from "../../toasts";
 import type { ActionsContact } from "../actions-contact";
 import { FicheTiroir } from "../fiche-tiroir";
 import { actionsInertes, contactSuivi, datesRapides, enDemo, etapes, parTexte } from "./fixtures";
@@ -15,14 +16,16 @@ interface Rappels {
 
 function afficher(contact: ContactSuivi | null, { actions = {}, deplacer, onFerme }: Rappels = {}) {
   return render(
-    <FicheTiroir
+    <FournisseurToasts>
+      <FicheTiroir
       contact={contact}
       etapes={etapes}
       datesRapides={datesRapides}
       actions={{ ...actionsInertes, ...actions }}
       deplacer={deplacer ?? (() => {})}
       onFerme={onFerme ?? (() => {})}
-    />,
+      />
+    </FournisseurToasts>,
   );
 }
 
@@ -164,6 +167,46 @@ describe("FicheTiroir", () => {
     fireEvent.click(within(fiche()).getByRole("button", { name: "Annuler" }));
     expect(within(fiche()).queryByLabelText("Nom")).toBeNull();
     expect(modifier).not.toHaveBeenCalled();
+  });
+
+  it("propose d'annuler une modification de la fiche, en renvoyant les anciennes valeurs", async () => {
+    const modifier = vi.fn(async () => ({}));
+    afficher(enDemo({ fonction: "Responsable PLM" }), { actions: { modifier } });
+
+    fireEvent.click(within(fiche()).getByRole("button", { name: "Modifier" }));
+    fireEvent.change(within(fiche()).getByLabelText(/Entreprise/), { target: { value: "Vernier SA" } });
+    await act(async () => {
+      fireEvent.click(within(fiche()).getByRole("button", { name: "Enregistrer" }));
+    });
+    await screen.findByText("Fiche enregistrée.");
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Annuler" }));
+    });
+
+    expect(modifier.mock.calls).toEqual([
+      [7, { nom: "Claire Vasseur", entreprise: "Vernier SA", fonction: "Responsable PLM", email: "", telephone: "" }],
+      [7, { nom: "Claire Vasseur", entreprise: "Ateliers Vernier", fonction: "Responsable PLM", email: "", telephone: "" }],
+    ]);
+  });
+
+  it("propose d'annuler un marquage fait depuis la fiche", async () => {
+    const annulerMarquage = vi.fn(async () => {});
+    afficher(
+      enDemo({ relanceLe: "2026-11-18", retardRelance: 0, dernierEchangeLe: "2026-11-04", note: "Note" }),
+      { actions: { annulerMarquage } },
+    );
+
+    await act(async () => {
+      fireEvent.click(within(fiche()).getByRole("button", { name: "Marquer comme relancé" }));
+    });
+    await screen.findByText("Échange enregistré.");
+    fireEvent.click(screen.getByRole("button", { name: "Annuler" }));
+
+    expect(annulerMarquage).toHaveBeenCalledExactlyOnceWith(7, {
+      dernierEchangeLe: "2026-11-04",
+      note: "Note",
+      relanceLe: "2026-11-18",
+    });
   });
 
   it("supprime le contact après confirmation", async () => {
