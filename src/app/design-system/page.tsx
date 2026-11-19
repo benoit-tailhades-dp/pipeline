@@ -15,7 +15,12 @@ import {
 import { ThemeSwitch } from "@/components/theme-switch";
 import { cn } from "@/lib/utils";
 
-import { ExempleTiroir, ExemplesCartes, ExemplesGlisser } from "./exemples-tableau";
+import {
+  ExempleTiroir,
+  ExemplesCartes,
+  ExemplesGlisser,
+  ExemplesRelance,
+} from "./exemples-tableau";
 
 export const metadata: Metadata = {
   title: "Design system",
@@ -289,6 +294,13 @@ export default function DesignSystem() {
         description="Une colonne par étape, sur fond colonne. Au clavier, Maj + flèche droite ou gauche sur le nom change l’étape."
       >
         <ExemplesGlisser />
+      </Section>
+
+      <Section
+        titre="Relancer"
+        description="Dates rapides et progression du jour, dans la fiche et sur la page « Aujourd’hui »."
+      >
+        <ExemplesRelance />
       </Section>
 
       <Section

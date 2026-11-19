@@ -20,7 +20,12 @@ import { startTransition, useId, useOptimistic, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { ColonneDuTableau, ContactSuivi, Etape } from "@/services/contact-service";
+import type {
+  ColonneDuTableau,
+  ContactSuivi,
+  DateRapide,
+  Etape,
+} from "@/services/contact-service";
 
 import type { ActionsContact } from "./actions-contact";
 import { CarteContact } from "./carte-contact";
@@ -277,10 +282,12 @@ export function TableauContacts({
   colonnes,
   actions,
   ajouterAction,
+  datesRapides = [],
 }: {
   colonnes: ColonneDuTableau[];
   actions: ActionsContact;
   ajouterAction: ActionFormulaireContact;
+  datesRapides?: readonly DateRapide[];
 }) {
   const [affichees, deplacerOptimiste] = useOptimistic(colonnes, deplacerDans);
   const [formulaire, setFormulaire] = useState(false);
@@ -360,6 +367,7 @@ export function TableauContacts({
         contact={fiche ? trouver(affichees, fiche.id) : null}
         ouvert={fiche?.ouverte ?? false}
         etapes={etapes}
+        datesRapides={datesRapides}
         actions={actions}
         deplacer={deplacer}
         onFerme={() => setFiche((actuelle) => actuelle && { ...actuelle, ouverte: false })}

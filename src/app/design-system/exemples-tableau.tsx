@@ -1,6 +1,10 @@
 "use client";
 
+import { useState } from "react";
+
 import { CarteContact } from "@/components/contacts/carte-contact";
+import { DatesRapides } from "@/components/contacts/dates-rapides";
+import { ProgressionDuJour } from "@/components/contacts/progression-du-jour";
 import { EnTeteColonne } from "@/components/contacts/tableau-contacts";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,7 +15,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import type { ColonneDuTableau, ContactSuivi } from "@/services/contact-service";
+import type { ColonneDuTableau, ContactSuivi, DateRapide } from "@/services/contact-service";
 
 // Exemples figés au 18 novembre 2026, comme dans LOTS.md.
 const claire: ContactSuivi = {
@@ -107,7 +111,35 @@ const colonnes: ColonneDuTableau[] = [
   { code: "gagne", temperature: "signe", contacts: [] },
 ];
 
+const datesRapides: DateRapide[] = [
+  { code: "demain", date: "2026-11-19" },
+  { code: "3-jours", date: "2026-11-21" },
+  { code: "1-semaine", date: "2026-11-25" },
+  { code: "2-semaines", date: "2026-12-02" },
+];
+
 const rien = () => {};
+
+export function ExemplesRelance() {
+  const [choisie, setChoisie] = useState<string | null>("2026-11-25");
+  return (
+    <div className="grid max-w-xl gap-8">
+      <figure className="grid gap-2">
+        <DatesRapides dates={datesRapides} choisie={choisie} onChoisir={setChoisie} />
+        <figcaption className="text-sm text-muted-foreground">
+          Dates rapides : le jour réel sous chaque choix. En sélection, la date retenue est
+          cerclée de sapin ; ailleurs, un clic planifie directement.
+        </figcaption>
+      </figure>
+      <figure className="grid gap-2">
+        <ProgressionDuJour faites={2} total={5} />
+        <figcaption className="text-sm text-muted-foreground">
+          Progression du jour : un segment par relance, en piste.
+        </figcaption>
+      </figure>
+    </div>
+  );
+}
 
 export function ExemplesCartes() {
   return (

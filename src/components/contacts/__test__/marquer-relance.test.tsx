@@ -2,9 +2,10 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { MarquerRelance, type EtatMarquage, type SaisieMarquage } from "../marquer-relance";
+import { datesRapides } from "./fixtures";
 
 function afficher(marquer: (id: number, saisie: SaisieMarquage) => Promise<EtatMarquage>) {
-  return render(<MarquerRelance id={7} marquerAction={marquer} />);
+  return render(<MarquerRelance id={7} marquerAction={marquer} datesRapides={datesRapides} />);
 }
 
 function marquer() {
@@ -12,6 +13,21 @@ function marquer() {
 }
 
 describe("MarquerRelance", () => {
+  it("remplit la relance suivante au 25 novembre quand je choisis « Dans 1 semaine »", async () => {
+    const action = vi.fn(async () => ({}));
+    afficher(action);
+
+    const semaine = screen.getByRole("button", { name: /^Dans 1 semaine/ });
+    fireEvent.click(semaine);
+    expect((screen.getByLabelText(/Relance suivante/) as HTMLInputElement).value).toBe("2026-11-25");
+    expect(semaine.getAttribute("aria-pressed")).toBe("true");
+    marquer();
+
+    await waitFor(() =>
+      expect(action).toHaveBeenCalledExactlyOnceWith(7, { note: "", prochaineRelance: "2026-11-25" }),
+    );
+  });
+
   it("propose une note et une relance suivante, toutes deux facultatives", () => {
     afficher(async () => ({}));
 

@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 import { Suspense } from "react";
 
-import { marquerRelance } from "@/app/actions";
+import { marquerRelance, planifierRelance } from "@/app/actions";
 import { Barre } from "@/app/barre";
 import { ListeARelancer } from "@/components/contacts/liste-a-relancer";
+import { ProgressionDuJour } from "@/components/contacts/progression-du-jour";
 import { contactService } from "@/server/container";
 
 export const metadata: Metadata = {
@@ -13,8 +14,22 @@ export const metadata: Metadata = {
 
 async function RelancesDuJour() {
   await connection();
-  const relances = await (await contactService()).aRelancer();
-  return <ListeARelancer contacts={relances} marquerAction={marquerRelance} />;
+  const service = await contactService();
+  const [relances, progression] = await Promise.all([
+    service.aRelancer(),
+    service.progressionDuJour(),
+  ]);
+  return (
+    <>
+      <ProgressionDuJour {...progression} />
+      <ListeARelancer
+        contacts={relances}
+        marquerAction={marquerRelance}
+        planifierAction={planifierRelance}
+        datesRapides={service.datesRapides()}
+      />
+    </>
+  );
 }
 
 export default function Aujourdhui() {

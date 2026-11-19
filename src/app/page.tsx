@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import {
   ajouterContact,
   changerEtape,
+  marquerRelance,
   modifierContact,
   planifierRelance,
   retirerRelance,
@@ -16,6 +17,7 @@ import { contactService } from "@/server/container";
 
 const actionsContact: ActionsContact = {
   changerEtape,
+  marquer: marquerRelance,
   planifierRelance,
   retirerRelance,
   modifier: modifierContact,
@@ -25,8 +27,16 @@ const actionsContact: ActionsContact = {
 async function TableauCourant() {
   // libSQL en mode fichier est synchrone : sans connection(), Next figerait le tableau au build.
   await connection();
-  const colonnes = await (await contactService()).tableau();
-  return <TableauContacts colonnes={colonnes} actions={actionsContact} ajouterAction={ajouterContact} />;
+  const service = await contactService();
+  const colonnes = await service.tableau();
+  return (
+    <TableauContacts
+      colonnes={colonnes}
+      actions={actionsContact}
+      ajouterAction={ajouterContact}
+      datesRapides={service.datesRapides()}
+    />
+  );
 }
 
 export default function Accueil() {

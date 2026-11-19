@@ -1,13 +1,26 @@
-import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
 import type { ContactARelancer } from "@/services/contact-service";
 
 import { ListeARelancer as Liste } from "../liste-a-relancer";
-import { contactARelancer } from "./fixtures";
+import { contactARelancer, datesRapides } from "./fixtures";
 
-function ListeARelancer({ contacts }: { contacts: ContactARelancer[] }) {
-  return <Liste contacts={contacts} marquerAction={async () => ({})} />;
+function ListeARelancer({
+  contacts,
+  planifier = async () => ({}),
+}: {
+  contacts: ContactARelancer[];
+  planifier?: (id: number, date: string) => Promise<{ erreur?: string }>;
+}) {
+  return (
+    <Liste
+      contacts={contacts}
+      marquerAction={async () => ({})}
+      planifierAction={planifier}
+      datesRapides={datesRapides}
+    />
+  );
 }
 
 describe("ListeARelancer", () => {
@@ -58,6 +71,19 @@ describe("ListeARelancer", () => {
 
     screen.getByText("Personne à relancer aujourd’hui.");
     expect(screen.queryAllByRole("listitem")).toHaveLength(0);
+  });
+
+  it("reporte la relance à demain quand je choisis « Reporter » puis « Demain »", async () => {
+    const planifier = vi.fn(async () => ({}));
+    render(<ListeARelancer contacts={[contactARelancer()]} planifier={planifier} />);
+    const element = screen.getByRole("listitem");
+    expect(within(element).queryByRole("group", { name: "Reporter au" })).toBeNull();
+
+    fireEvent.click(within(element).getByRole("button", { name: "Reporter" }));
+    const reporter = within(element).getByRole("group", { name: "Reporter au" });
+    fireEvent.click(within(reporter).getByRole("button", { name: /^Demain/ }));
+
+    await waitFor(() => expect(planifier).toHaveBeenCalledExactlyOnceWith(7, "2026-11-19"));
   });
 
   it("propose de marquer chaque contact comme relancé", () => {

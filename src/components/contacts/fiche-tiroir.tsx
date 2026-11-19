@@ -13,11 +13,17 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
-import type { ContactSuivi, Etape, EtapeDuParcours } from "@/services/contact-service";
+import type {
+  ContactSuivi,
+  DateRapide,
+  Etape,
+  EtapeDuParcours,
+} from "@/services/contact-service";
 
 import type { ActionsContact } from "./actions-contact";
 import { formaterDateCourte } from "./dates";
 import { FicheContact } from "./fiche-contact";
+import { MarquerRelance } from "./marquer-relance";
 import { RelanceContact } from "./relance-contact";
 import { Avatar, LIBELLES_ETAPES, Pastille, TEMPERATURES } from "./temperature";
 
@@ -156,17 +162,43 @@ function ConfirmationSuppression({
   );
 }
 
+/** Relance due : la fiche permet de l'enregistrer comme faite. */
+function RelanceDue({
+  contact,
+  datesRapides,
+  marquerAction,
+}: {
+  contact: ContactSuivi;
+  datesRapides: readonly DateRapide[];
+  marquerAction: ActionsContact["marquer"];
+}) {
+  const retard = contact.retardRelance ?? 0;
+  return (
+    <div className="grid gap-3">
+      <p className="font-semibold">
+        {retard > 0
+          ? `En retard de ${retard} ${retard > 1 ? "jours" : "jour"}`
+          : "À relancer aujourd’hui"}
+      </p>
+      <MarquerRelance id={contact.id} marquerAction={marquerAction} datesRapides={datesRapides} />
+    </div>
+  );
+}
+
 function ContenuFiche({
   contact,
   etapes,
+  datesRapides,
   actions,
   deplacer,
 }: {
   contact: ContactSuivi;
   etapes: readonly EtapeDuParcours[];
+  datesRapides: readonly DateRapide[];
   actions: ActionsContact;
   deplacer: (id: number, etape: Etape) => void;
 }) {
+  const due = contact.retardRelance !== null && contact.retardRelance >= 0;
   const [mode, setMode] = useState<"suivi" | "fiche" | "suppression">("suivi");
   const sousTitre = [contact.fonction, contact.entreprise].filter(Boolean).join(", ");
 
@@ -204,10 +236,18 @@ function ContenuFiche({
         </Bloc>
 
         <Bloc titre="Relance">
+          {due && (
+            <RelanceDue
+              contact={contact}
+              datesRapides={datesRapides}
+              marquerAction={actions.marquer}
+            />
+          )}
           <RelanceContact
             contact={contact}
             planifierAction={actions.planifierRelance}
             retirerAction={actions.retirerRelance}
+            datesRapides={due ? [] : datesRapides}
           />
         </Bloc>
 
@@ -267,6 +307,7 @@ export function FicheTiroir({
   contact,
   ouvert = contact !== null,
   etapes,
+  datesRapides = [],
   actions,
   deplacer,
   onFerme,
@@ -275,6 +316,7 @@ export function FicheTiroir({
   contact: ContactSuivi | null;
   ouvert?: boolean;
   etapes: readonly EtapeDuParcours[];
+  datesRapides?: readonly DateRapide[];
   actions: ActionsContact;
   deplacer: (id: number, etape: Etape) => void;
   onFerme: () => void;
@@ -292,6 +334,7 @@ export function FicheTiroir({
             key={contact.id}
             contact={contact}
             etapes={etapes}
+            datesRapides={datesRapides}
             actions={actions}
             deplacer={deplacer}
           />

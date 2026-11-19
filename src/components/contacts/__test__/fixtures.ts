@@ -2,6 +2,7 @@ import type {
   ColonneDuTableau,
   ContactARelancer,
   ContactSuivi,
+  DateRapide,
   EtapeDuParcours,
 } from "@/services/contact-service";
 
@@ -63,8 +64,17 @@ export function colonnes(contacts: ContactSuivi[]): ColonneDuTableau[] {
   }));
 }
 
+/** Dates rapides telles que le service les renvoie le 18 novembre 2026. */
+export const datesRapides: DateRapide[] = [
+  { code: "demain", date: "2026-11-19" },
+  { code: "3-jours", date: "2026-11-21" },
+  { code: "1-semaine", date: "2026-11-25" },
+  { code: "2-semaines", date: "2026-12-02" },
+];
+
 export const actionsInertes: ActionsContact = {
   changerEtape: async () => {},
+  marquer: async () => ({}),
   planifierRelance: async () => ({}),
   retirerRelance: async () => {},
   modifier: async () => ({}),

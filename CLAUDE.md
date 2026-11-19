@@ -31,6 +31,8 @@ Lot 6 livré : depuis la carte, « Modifier » ouvre la fiche (`FicheContact` : 
 
 Lot 7 livré : l'accueil est un tableau de cinq colonnes (`TableauContacts`, service `tableau()`, qui trie les relances dues d'abord puis du plus récent au plus ancien). Le glisser-déposer passe par `@dnd-kit/core` (souris, appui long au doigt) ; au clavier, Maj + flèche sur le nom de la carte. La carte en main se lit dans `useDndContext()`, jamais dans un état à part : un geste plus rapide qu'un rendu se termine sans `onDragEnd`. Le déplacement s'affiche tout de suite (`useOptimistic`), le rafraîchissement rétablit l'ordre du service. Un clic sur la carte ouvre `FicheTiroir` (Sheet) : piste cliquable, relance, dernier échange, coordonnées, modification, suppression. `ContactSuivi.retardRelance` dit si la relance est en retard (> 0), du jour (0) ou à venir (< 0). « À relancer aujourd'hui » est sur `/aujourdhui` ; la barre (`BarreApp`, chargée par `src/app/barre.tsx`) affiche le nombre de relances dues. Jetons ajoutés : `colonne` et `bord-fort`.
 
+Lot 8 livré : le service propose les dates rapides (`datesRapides()` : demain, 3 jours, 1 semaine, 2 semaines, avec `ajouterJours`) et la progression du jour (`progressionDuJour()` : échanges enregistrés aujourd'hui sur relances du jour). `DatesRapides` sert à trois endroits : dans la fiche, un clic planifie ; dans `MarquerRelance`, il remplit la relance suivante ; sur « Aujourd'hui », derrière « Reporter » (`ReporterRelance`). La fiche permet de marquer comme relancé un contact dont la relance est due. `ProgressionDuJour` est une piste à un segment par relance (pas de largeur dynamique).
+
 Le découpage en lots, avec les critères d'acceptation et le statut de chaque lot, est dans `LOTS.md`.
 
 ## Organisation des couches

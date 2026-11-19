@@ -5,7 +5,7 @@ import type { ContactSuivi } from "@/services/contact-service";
 
 import type { ActionsContact } from "../actions-contact";
 import { FicheTiroir } from "../fiche-tiroir";
-import { actionsInertes, contactSuivi, enDemo, etapes, parTexte } from "./fixtures";
+import { actionsInertes, contactSuivi, datesRapides, enDemo, etapes, parTexte } from "./fixtures";
 
 interface Rappels {
   actions?: Partial<ActionsContact>;
@@ -18,6 +18,7 @@ function afficher(contact: ContactSuivi | null, { actions = {}, deplacer, onFerm
     <FicheTiroir
       contact={contact}
       etapes={etapes}
+      datesRapides={datesRapides}
       actions={{ ...actionsInertes, ...actions }}
       deplacer={deplacer ?? (() => {})}
       onFerme={onFerme ?? (() => {})}
@@ -90,6 +91,35 @@ describe("FicheTiroir", () => {
     });
 
     expect(retirerRelance).toHaveBeenCalledExactlyOnceWith(7);
+  });
+
+  it("permet de marquer comme relancé un contact dont la relance est due", async () => {
+    const marquer = vi.fn(async () => ({}));
+    afficher(enDemo({ relanceLe: "2026-11-15", retardRelance: 3 }), { actions: { marquer } });
+
+    within(fiche()).getByText("En retard de 3 jours");
+    await act(async () => {
+      fireEvent.click(within(fiche()).getByRole("button", { name: "Marquer comme relancé" }));
+    });
+
+    expect(marquer).toHaveBeenCalledExactlyOnceWith(7, { note: "", prochaineRelance: "" });
+  });
+
+  it("ne propose pas de marquer comme relancé un contact dont la relance est à venir", () => {
+    afficher(enDemo({ relanceLe: "2026-11-24", retardRelance: -6 }));
+
+    expect(within(fiche()).queryByRole("button", { name: "Marquer comme relancé" })).toBeNull();
+  });
+
+  it("planifie la relance au 21 novembre quand je choisis « Dans 3 jours » dans la fiche", async () => {
+    const planifierRelance = vi.fn(async () => ({}));
+    afficher(enDemo(), { actions: { planifierRelance } });
+
+    await act(async () => {
+      fireEvent.click(within(fiche()).getByRole("button", { name: /^Dans 3 jours/ }));
+    });
+
+    expect(planifierRelance).toHaveBeenCalledExactlyOnceWith(7, "2026-11-21");
   });
 
   it("affiche le dernier échange et sa note", () => {

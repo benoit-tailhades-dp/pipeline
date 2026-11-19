@@ -591,6 +591,69 @@ describe("ContactService", () => {
     });
   });
 
+  describe("datesRapides", () => {
+    it("propose demain, dans 3 jours, dans 1 semaine et dans 2 semaines, à partir d'aujourd'hui", () => {
+      // `maintenant` : le 18 novembre 2026 à 10 h, heure de Paris.
+      expect(service.datesRapides()).toEqual([
+        { code: "demain", date: "2026-11-19" },
+        { code: "3-jours", date: "2026-11-21" },
+        { code: "1-semaine", date: "2026-11-25" },
+        { code: "2-semaines", date: "2026-12-02" },
+      ]);
+    });
+
+    it("compte à partir d'aujourd'hui à l'heure de Paris", () => {
+      // 23 h 30 UTC le 18 : il est déjà 0 h 30 le 19 à Paris.
+      maintenant = new Date("2026-11-18T23:30:00.000Z");
+
+      expect(service.datesRapides()[0]).toEqual({ code: "demain", date: "2026-11-20" });
+    });
+  });
+
+  describe("progressionDuJour", () => {
+    // `maintenant` : le 18 novembre 2026 à 10 h, heure de Paris.
+    async function contact(relance: string | null, echange: string | null = null) {
+      const cree = await repository.ajouter({
+        nom: "Claire Vasseur",
+        entreprise: null,
+        etape: "demo",
+        creeLe: maintenant,
+      });
+      await repository.enregistrerEchange(cree.id, {
+        dernierEchangeLe: echange ?? "2026-11-01",
+        note: null,
+        relanceLe: relance,
+      });
+      return cree;
+    }
+
+    it("compte 1 sur 5 avec 4 relances dues et 1 échange enregistré aujourd'hui", async () => {
+      await contact("2026-11-18");
+      await contact("2026-11-18");
+      await contact("2026-11-15");
+      await contact("2026-11-17");
+      await contact("2026-11-25", "2026-11-18");
+
+      await expect(service.progressionDuJour()).resolves.toEqual({ faites: 1, total: 5 });
+    });
+
+    it("ne compte ni les relances à venir ni les contacts sans relance", async () => {
+      await contact("2026-11-19");
+      await contact(null);
+
+      await expect(service.progressionDuJour()).resolves.toEqual({ faites: 0, total: 0 });
+    });
+
+    it("fait passer un contact de « à faire » à « fait » quand je le marque comme relancé", async () => {
+      const claire = await contact("2026-11-18");
+      await contact("2026-11-16");
+
+      await service.marquerRelance(claire.id, { prochaineRelance: "2026-11-25" });
+
+      await expect(service.progressionDuJour()).resolves.toEqual({ faites: 1, total: 2 });
+    });
+  });
+
   describe("retardRelance", () => {
     // `maintenant` : le 18 novembre 2026 à 10 h, heure de Paris.
     it.each([

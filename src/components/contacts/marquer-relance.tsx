@@ -1,11 +1,13 @@
 "use client";
 
-import { useActionState, useId } from "react";
+import { useActionState, useId, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { ErreursEchange } from "@/services/contact-service";
+import type { DateRapide, ErreursEchange } from "@/services/contact-service";
+
+import { DatesRapides } from "./dates-rapides";
 
 export interface SaisieMarquage {
   note: string;
@@ -25,16 +27,24 @@ function texte(valeur: FormDataEntryValue | null): string {
 export function MarquerRelance({
   id,
   marquerAction,
+  datesRapides = [],
 }: {
   id: number;
   marquerAction: (id: number, saisie: SaisieMarquage) => Promise<EtatMarquage>;
+  /** Dates proposées par le service : un clic remplit la relance suivante. */
+  datesRapides?: readonly DateRapide[];
 }) {
+  // La relance suivante est contrôlée : les dates rapides la remplissent.
+  const [prochaine, setProchaine] = useState("");
   const [etat, envoyer, enCours] = useActionState(
-    (_etat: EtatMarquage, formData: FormData) =>
-      marquerAction(id, {
+    async (_etat: EtatMarquage, formData: FormData) => {
+      const resultat = await marquerAction(id, {
         note: texte(formData.get("note")),
         prochaineRelance: texte(formData.get("prochaine-relance")),
-      }),
+      });
+      if (!resultat.erreurs) setProchaine("");
+      return resultat;
+    },
     {},
   );
   const prefixe = useId();
@@ -77,7 +87,8 @@ export function MarquerRelance({
           id={idDate}
           name="prochaine-relance"
           type="date"
-          defaultValue={etat.valeurs?.prochaineRelance}
+          value={prochaine}
+          onChange={(event) => setProchaine(event.target.value)}
           aria-invalid={erreurDate ? true : undefined}
           aria-describedby={erreurDate ? idErreurDate : undefined}
         />
@@ -87,6 +98,17 @@ export function MarquerRelance({
           </p>
         )}
       </div>
+      {datesRapides.length > 0 && (
+        <div className="sm:col-span-2">
+          <DatesRapides
+            dates={datesRapides}
+            choisie={prochaine}
+            onChoisir={setProchaine}
+            legende="Dates rapides pour la relance suivante"
+            desactive={enCours}
+          />
+        </div>
+      )}
       <div className="sm:col-span-2">
         <Button type="submit" disabled={enCours}>
           Marquer comme relancé

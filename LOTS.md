@@ -102,7 +102,7 @@ Statut : livré
 
 ## Lot 8 : Relancer plus vite
 
-Statut : à faire
+Statut : livré
 
 **Parcours.** Pour planifier ou reporter une relance, je choisis une date rapide (Demain, Dans 3 jours, Dans 1 semaine, Dans 2 semaines) ou une autre date. Dans « Aujourd'hui », je peux reporter un contact sans le marquer comme relancé, et une barre montre combien de relances j'ai traitées dans la journée. Je peux aussi marquer un contact comme relancé depuis sa fiche.
 

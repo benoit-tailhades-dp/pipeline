@@ -1,6 +1,6 @@
 import type { Contact, ContactRepository, Etape } from "@/data/contact-repository";
 
-import { dateDuJour, estUneDate, joursEntre } from "./dates";
+import { ajouterJours, dateDuJour, estUneDate, joursEntre } from "./dates";
 
 export type { Contact, Etape };
 
@@ -31,6 +31,21 @@ export interface ContactSuivi extends Contact {
 /** Une colonne du tableau : une étape et ses contacts, dans l'ordre d'affichage. */
 export interface ColonneDuTableau extends EtapeDuParcours {
   contacts: ContactSuivi[];
+}
+
+export type CodeDateRapide = "demain" | "3-jours" | "1-semaine" | "2-semaines";
+
+/** Une date proposée en un clic pour planifier ou reporter une relance. */
+export interface DateRapide {
+  code: CodeDateRapide;
+  /** AAAA-MM-JJ. */
+  date: string;
+}
+
+/** Les relances du jour : celles déjà faites (un échange enregistré aujourd'hui) sur le total. */
+export interface ProgressionDuJour {
+  faites: number;
+  total: number;
 }
 
 /** Un contact de « À relancer aujourd'hui ». */
@@ -214,6 +229,13 @@ function aDesErreurs(erreurs: object): boolean {
   return Object.keys(erreurs).length > 0;
 }
 
+const DATES_RAPIDES: readonly { code: CodeDateRapide; jours: number }[] = [
+  { code: "demain", jours: 1 },
+  { code: "3-jours", jours: 3 },
+  { code: "1-semaine", jours: 7 },
+  { code: "2-semaines", jours: 14 },
+];
+
 /** Fuseau de l'utilisateur : c'est à son heure que commence « aujourd'hui ». */
 const FUSEAU_PAR_DEFAUT = "Europe/Paris";
 
@@ -270,6 +292,26 @@ export function createContactService({
         ...etape,
         contacts: suivis.filter((contact) => contact.etape === etape.code),
       }));
+    },
+
+    /** Demain, dans 3 jours, dans 1 semaine, dans 2 semaines, comptés depuis aujourd'hui. */
+    datesRapides(): DateRapide[] {
+      const jour = aujourdhui();
+      return DATES_RAPIDES.map(({ code, jours }) => ({ code, date: ajouterJours(jour, jours) }));
+    },
+
+    /**
+     * Faites : les contacts dont un échange a été enregistré aujourd'hui.
+     * À faire : les relances dues aujourd'hui ou en retard, sans échange aujourd'hui.
+     */
+    async progressionDuJour(): Promise<ProgressionDuJour> {
+      const jour = aujourdhui();
+      const tous = await contacts.lister();
+      const faites = tous.filter((c) => c.dernierEchangeLe === jour).length;
+      const aFaire = tous.filter(
+        (c) => c.relanceLe !== null && c.relanceLe <= jour && c.dernierEchangeLe !== jour,
+      ).length;
+      return { faites, total: faites + aFaire };
     },
 
     /** Les étapes dans l'ordre, pour la liste des étapes et la piste. */
