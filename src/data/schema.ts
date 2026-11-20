@@ -1,42 +1,53 @@
 import type { Db } from "./db";
 
+const CREER_CONTACTS = `
+  CREATE TABLE IF NOT EXISTS contacts (
+    id INTEGER PRIMARY KEY,
+    nom TEXT NOT NULL,
+    entreprise TEXT,
+    cree_le INTEGER NOT NULL
+  )
+`;
+
+const LIRE_COLONNES = "SELECT name FROM pragma_table_info('contacts')";
+
 /**
- * Crée les tables absentes puis ajoute les colonnes apparues depuis.
- * Sans effet sur une base à jour : le container l'appelle à chaque démarrage.
+ * Colonnes apparues après le lot 1, dans l'ordre des lots. Les requêtes sont écrites
+ * en entier : un nom de colonne ne se passe pas en paramètre.
  */
-export async function appliquerSchema(db: Db): Promise<void> {
-  await db.execute(`
-    CREATE TABLE IF NOT EXISTS contacts (
-      id INTEGER PRIMARY KEY,
-      nom TEXT NOT NULL,
-      entreprise TEXT,
-      cree_le INTEGER NOT NULL
-    )
-  `);
-
+const COLONNES_AJOUTEES: readonly { nom: string; ajout: string }[] = [
   // Lot 2 : les contacts enregistrés avant les étapes démarrent à « À contacter ».
-  await ajouterColonneAbsente(
-    db,
-    "etape",
-    "ALTER TABLE contacts ADD COLUMN etape TEXT NOT NULL DEFAULT 'a-contacter'",
-  );
+  {
+    nom: "etape",
+    ajout: "ALTER TABLE contacts ADD COLUMN etape TEXT NOT NULL DEFAULT 'a-contacter'",
+  },
   // Lot 3 : date de relance au format AAAA-MM-JJ, absente par défaut.
-  await ajouterColonneAbsente(db, "relance_le", "ALTER TABLE contacts ADD COLUMN relance_le TEXT");
+  { nom: "relance_le", ajout: "ALTER TABLE contacts ADD COLUMN relance_le TEXT" },
   // Lot 5 : date (AAAA-MM-JJ) et note du dernier échange.
-  await ajouterColonneAbsente(
-    db,
-    "dernier_echange_le",
-    "ALTER TABLE contacts ADD COLUMN dernier_echange_le TEXT",
-  );
-  await ajouterColonneAbsente(db, "note", "ALTER TABLE contacts ADD COLUMN note TEXT");
+  { nom: "dernier_echange_le", ajout: "ALTER TABLE contacts ADD COLUMN dernier_echange_le TEXT" },
+  { nom: "note", ajout: "ALTER TABLE contacts ADD COLUMN note TEXT" },
   // Lot 6 : coordonnées complétées depuis la fiche.
-  await ajouterColonneAbsente(db, "fonction", "ALTER TABLE contacts ADD COLUMN fonction TEXT");
-  await ajouterColonneAbsente(db, "email", "ALTER TABLE contacts ADD COLUMN email TEXT");
-  await ajouterColonneAbsente(db, "telephone", "ALTER TABLE contacts ADD COLUMN telephone TEXT");
-}
+  { nom: "fonction", ajout: "ALTER TABLE contacts ADD COLUMN fonction TEXT" },
+  { nom: "email", ajout: "ALTER TABLE contacts ADD COLUMN email TEXT" },
+  { nom: "telephone", ajout: "ALTER TABLE contacts ADD COLUMN telephone TEXT" },
+];
 
-async function ajouterColonneAbsente(db: Db, colonne: string, ajout: string): Promise<void> {
-  const existantes = await db.execute("SELECT name FROM pragma_table_info('contacts')");
-  if (existantes.rows.some((ligne) => ligne.name === colonne)) return;
-  await db.execute(ajout);
+/**
+ * Crée les tables absentes puis ajoute les colonnes apparues depuis, et renvoie
+ * les colonnes ajoutées. Sur une base à jour : deux requêtes, sans effet. Le container
+ * l'appelle à chaque démarrage ; `pnpm db:schema` l'applique à la demande (Turso).
+ */
+export async function appliquerSchema(db: Db): Promise<string[]> {
+  await db.execute(CREER_CONTACTS);
+  const { rows } = await db.execute(LIRE_COLONNES);
+  const existantes = new Set(rows.map((ligne) => String(ligne.name)));
+  const manquantes = COLONNES_AJOUTEES.filter((colonne) => !existantes.has(colonne.nom));
+  if (manquantes.length > 0) {
+    // Un seul aller-retour, dans une transaction : tout ou rien.
+    await db.batch(
+      manquantes.map((colonne) => colonne.ajout),
+      "write",
+    );
+  }
+  return manquantes.map((colonne) => colonne.nom);
 }

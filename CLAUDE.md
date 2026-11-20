@@ -14,6 +14,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Ajouter un composant shadcn : `pnpm dlx shadcn@latest add <composant>`
 - `pnpm test` : Vitest en exécution unique. `pnpm test:watch` : mode watch. Un seul fichier : `pnpm exec vitest run <chemin>`
 - `pnpm start` en local : définir `DATABASE_URL` (ex. `DATABASE_URL=file:local.db pnpm start`), sinon la page lève une erreur en production
+- La base est sur Turso, en local comme en production : `DATABASE_URL` et `DATABASE_AUTH_TOKEN` dans `.env.local` (non versionné ; modèle : `.env.example`) et dans les variables Vercel. Sans `DATABASE_URL`, hors production, l'app se rabat sur `file:local.db`
+- `pnpm db:schema` : applique le schéma à la base de `.env.local` (sans effet si elle est à jour)
+- `pnpm db:seed` : ajoute 12 contacts d'exemple (fictifs, datés à partir d'aujourd'hui) à la base de `.env.local`. Refuse une base qui contient déjà des contacts, sauf avec `--forcer`
 
 ## État du projet
 
@@ -41,8 +44,8 @@ Le découpage en lots, avec les critères d'acceptation et le statut de chaque l
 
 - **Présentation** : `src/app/`, `src/components/`. Elle obtient les services via `@/server/container`, jamais via `@/data`.
 - **Service** : `src/services/`. Fabriques `createXxxService(repository)` qui reçoivent les interfaces de données. Elles n'importent de `@/data` que des types (`import type`).
-- **Données** : `src/data/`. Les interfaces (`xxx-repository.ts`, sans aucun import), le client (`db.ts`, seul import de `@libsql/client`) et les implémentations (`libsql-xxx-repository.ts`).
-- **Assemblage** : `src/server/container.ts` (`server-only`). C'est le seul fichier qui relie les services aux implémentations. La base est ouverte au premier appel. Il lit `DATABASE_URL` (défaut `file:local.db` hors production) et `DATABASE_AUTH_TOKEN` (Turso).
+- **Données** : `src/data/`. Les interfaces (`xxx-repository.ts`, sans aucun import), le client (`db.ts`, seul import de `@libsql/client`), la configuration (`configuration.ts` : `lireConfiguration` lit `DATABASE_URL` et `DATABASE_AUTH_TOKEN`), le schéma (`schema.ts`) et les implémentations (`libsql-xxx-repository.ts`).
+- **Assemblage** : `src/server/container.ts` (`server-only`). C'est le seul fichier qui relie les services aux implémentations. La base est ouverte au premier appel, avec `lireConfiguration(process.env)` : `file:local.db` par défaut hors production, Turso quand `DATABASE_URL` et `DATABASE_AUTH_TOKEN` le désignent (une URL distante sans jeton lève une erreur). Le schéma est appliqué à l'ouverture : deux requêtes sur une base à jour.
 - Ces règles sont imposées par `@typescript-eslint/no-restricted-imports` dans `eslint.config.mjs`.
 - libSQL en mode fichier utilise une API synchrone : avec `cacheComponents`, appeler `await connection()` (`next/server`) avant toute lecture faite pendant le rendu, sinon le résultat est figé au build.
 
@@ -74,5 +77,5 @@ Référence vivante : la route `/design-system` (`src/app/design-system/page.tsx
 
 - Le sens des dépendances est présentation → service → données. Seule la couche données importe le client de base. La couche service ne dépend ni de Next ni de la base, ce qui la rend testable unitairement.
 - Le passage à une base managée (Turso) ne doit modifier que la couche données. La couche service consomme donc une interface de données, jamais le client SQL directement.
-- Sur Vercel, le système de fichiers est éphémère : un fichier SQLite local ne persiste pas en production. Le critère « mes contacts sont toujours là après redémarrage » impose une base distante une fois l'app déployée.
+- Sur Vercel, le système de fichiers est éphémère : un fichier SQLite local ne persiste pas en production. Le critère « mes contacts sont toujours là après redémarrage » impose une base distante une fois l'app déployée : Turso, en production comme en développement (`DATABASE_URL` et `DATABASE_AUTH_TOKEN`). Les noms des variables sont dans `.env.example`.
 - Il n'y a ni authentification ni multi-utilisateur : ne pas en ajouter.

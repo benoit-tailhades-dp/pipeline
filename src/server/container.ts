@@ -1,5 +1,6 @@
 import "server-only";
 
+import { lireConfiguration } from "@/data/configuration";
 import { createDb, type Db } from "@/data/db";
 import { createLibsqlContactRepository } from "@/data/libsql-contact-repository";
 import { appliquerSchema } from "@/data/schema";
@@ -10,19 +11,11 @@ import { createContactService } from "@/services/contact-service";
  * La présentation importe ce fichier, jamais `@/data`.
  */
 
-function databaseUrl(): string {
-  const url = process.env.DATABASE_URL;
-  if (url) return url;
-  if (process.env.NODE_ENV === "production") {
-    throw new Error(
-      "DATABASE_URL manquant : un fichier SQLite local ne persiste pas sur Vercel.",
-    );
-  }
-  return "file:local.db";
-}
-
 async function ouvrir(): Promise<Db> {
-  const db = createDb(databaseUrl(), process.env.DATABASE_AUTH_TOKEN);
+  // Turso quand DATABASE_URL et DATABASE_AUTH_TOKEN le désignent (.env.local, Vercel) ;
+  // à défaut, hors production, un fichier SQLite.
+  const { url, authToken } = lireConfiguration(process.env);
+  const db = createDb(url, authToken);
   await appliquerSchema(db);
   return db;
 }
