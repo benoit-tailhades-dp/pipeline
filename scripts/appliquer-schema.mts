@@ -1,6 +1,6 @@
 /**
  * Applique le schéma à la base désignée par DATABASE_URL (et DATABASE_AUTH_TOKEN pour Turso).
- * Sans effet sur une base à jour. Lancement : `pnpm db:schema`, qui lit `.env.turso` s'il existe.
+ * Sans effet sur une base à jour. Lancement : `pnpm db:schema`, qui lit `.env.local` comme l'app.
  */
 import { decrireBase, lireConfiguration } from "../src/data/configuration.ts";
 import { createDb } from "../src/data/db.ts";

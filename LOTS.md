@@ -141,7 +141,7 @@ Statut : livré
 ## Questions ouvertes
 
 1. **Étape « Perdu ».** Il n'y en a pas pour l'instant : un prospect qui dit non reste dans le pipeline. Proposition : l'ajouter au lot 2, comme une sortie possible à toute étape, qui retire aussi le contact des relances.
-2. **Persistance en production.** Réglée : en production, la base est sur Turso (`DATABASE_URL`, `DATABASE_AUTH_TOKEN` dans Vercel), en local elle reste SQLite. Le schéma s'applique avec `pnpm db:schema` (voir CLAUDE.md), puis à chaque démarrage de l'app.
+2. **Persistance en production.** Réglée : la base est sur Turso, en production (variables Vercel) comme en développement (`.env.local`). Le schéma s'applique avec `pnpm db:schema` (voir CLAUDE.md), puis à chaque démarrage de l'app.
 
 ## Comment livrer un lot
 

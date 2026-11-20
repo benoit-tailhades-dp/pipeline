@@ -12,7 +12,8 @@ import { createContactService } from "@/services/contact-service";
  */
 
 async function ouvrir(): Promise<Db> {
-  // SQLite local par défaut, Turso quand DATABASE_URL et DATABASE_AUTH_TOKEN le désignent.
+  // Turso quand DATABASE_URL et DATABASE_AUTH_TOKEN le désignent (.env.local, Vercel) ;
+  // à défaut, hors production, un fichier SQLite.
   const { url, authToken } = lireConfiguration(process.env);
   const db = createDb(url, authToken);
   await appliquerSchema(db);

@@ -14,7 +14,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Ajouter un composant shadcn : `pnpm dlx shadcn@latest add <composant>`
 - `pnpm test` : Vitest en exécution unique. `pnpm test:watch` : mode watch. Un seul fichier : `pnpm exec vitest run <chemin>`
 - `pnpm start` en local : définir `DATABASE_URL` (ex. `DATABASE_URL=file:local.db pnpm start`), sinon la page lève une erreur en production
-- `pnpm db:schema` : applique le schéma à la base de `DATABASE_URL` (sans effet si elle est à jour). Pour Turso, mettre `DATABASE_URL` et `DATABASE_AUTH_TOKEN` dans `.env.turso` (non versionné), que la commande lit. Pas dans `.env.local` : `pnpm dev` passerait sur Turso
+- La base est sur Turso, en local comme en production : `DATABASE_URL` et `DATABASE_AUTH_TOKEN` dans `.env.local` (non versionné ; modèle : `.env.example`) et dans les variables Vercel. Sans `DATABASE_URL`, hors production, l'app se rabat sur `file:local.db`
+- `pnpm db:schema` : applique le schéma à la base de `.env.local` (sans effet si elle est à jour)
+- `pnpm db:seed` : ajoute 12 contacts d'exemple (fictifs, datés à partir d'aujourd'hui) à la base de `.env.local`. Refuse une base qui contient déjà des contacts, sauf avec `--forcer`
 
 ## État du projet
 
@@ -75,5 +77,5 @@ Référence vivante : la route `/design-system` (`src/app/design-system/page.tsx
 
 - Le sens des dépendances est présentation → service → données. Seule la couche données importe le client de base. La couche service ne dépend ni de Next ni de la base, ce qui la rend testable unitairement.
 - Le passage à une base managée (Turso) ne doit modifier que la couche données. La couche service consomme donc une interface de données, jamais le client SQL directement.
-- Sur Vercel, le système de fichiers est éphémère : un fichier SQLite local ne persiste pas en production. Le critère « mes contacts sont toujours là après redémarrage » impose une base distante une fois l'app déployée : Turso en production (`DATABASE_URL` et `DATABASE_AUTH_TOKEN` dans les variables Vercel), SQLite en local. Les noms des variables sont dans `.env.example`.
+- Sur Vercel, le système de fichiers est éphémère : un fichier SQLite local ne persiste pas en production. Le critère « mes contacts sont toujours là après redémarrage » impose une base distante une fois l'app déployée : Turso, en production comme en développement (`DATABASE_URL` et `DATABASE_AUTH_TOKEN`). Les noms des variables sont dans `.env.example`.
 - Il n'y a ni authentification ni multi-utilisateur : ne pas en ajouter.
